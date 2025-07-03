@@ -69,3 +69,6 @@ The app uses a custom session-based authentication system (not Lucia):
 2. **Server Code**: Keep server-only code in `$lib/server/` directory
 3. **Environment**: Set `DATABASE_URL` in `.env` file (see `.env.example`)
 4. **Type Safety**: TypeScript strict mode is enabled - ensure proper typing
+
+## Shadcn Component Management
+- Use `npx shadcn-svelte@latest add` for adding new components from shadcn
