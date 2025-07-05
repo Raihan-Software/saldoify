@@ -2,6 +2,12 @@
 
 A modern personal finance management application built with SvelteKit, PostgreSQL, and Docker.
 
+## 🚧 Project Status
+
+**This project is currently under active development and is NOT accepting contributions at this time.**
+
+Contributions will be welcomed after the initial product release is announced. Thank you for your understanding and interest in the project!
+
 ## Tech Stack
 
 - **Frontend**: SvelteKit 2.16.0 with Svelte 5
@@ -189,12 +195,10 @@ services:
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit changes: `git commit -am 'Add new feature'`
-4. Push to branch: `git push origin feature/your-feature`
-5. Submit a pull request
+🚫 **Contributions are currently CLOSED.**
 
-## License
+This project is not accepting pull requests, issues, or contributions until after the official product release announcement. Please check back later for updates on when contributions will be welcomed.
 
-[Your License Here]
+## Author
+
+Created and maintained by Raihan
