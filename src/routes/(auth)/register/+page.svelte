@@ -71,7 +71,7 @@
 						required
 					/>
 				</div>
-				{#if form?.errors?.name}
+				{#if form?.errors && 'name' in form.errors && form.errors.name}
 					<p class="text-sm text-red-500">{form.errors.name}</p>
 				{/if}
 			</div>
@@ -91,7 +91,7 @@
 						required
 					/>
 				</div>
-				{#if form?.errors?.email}
+				{#if form?.errors && 'email' in form.errors && form.errors.email}
 					<p class="text-sm text-red-500">{form.errors.email}</p>
 				{/if}
 			</div>
@@ -127,7 +127,7 @@
 						</p>
 					</div>
 				{/if}
-				{#if form?.errors?.password}
+				{#if form?.errors && 'password' in form.errors && form.errors.password}
 					<p class="text-sm text-red-500">{form.errors.password}</p>
 				{/if}
 			</div>
@@ -146,7 +146,7 @@
 						required
 					/>
 				</div>
-				{#if form?.errors?.confirmPassword}
+				{#if form?.errors && 'confirmPassword' in form.errors && form.errors.confirmPassword}
 					<p class="text-sm text-red-500">{form.errors.confirmPassword}</p>
 				{/if}
 			</div>
@@ -161,7 +161,7 @@
 						<a href="/privacy" class="font-medium text-primary hover:underline">Privacy Policy</a>
 					</Label>
 				</div>
-				{#if form?.errors?.terms}
+				{#if form?.errors && 'terms' in form.errors && form.errors.terms}
 					<p class="text-sm text-red-500">{form.errors.terms}</p>
 				{/if}
 			</div>

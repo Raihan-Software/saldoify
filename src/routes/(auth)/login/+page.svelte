@@ -48,7 +48,7 @@
 						required
 					/>
 				</div>
-				{#if form?.errors?.email}
+				{#if form?.errors && 'email' in form.errors && form.errors.email}
 					<p class="text-sm text-red-500">{form.errors.email}</p>
 				{/if}
 			</div>
@@ -72,7 +72,7 @@
 						required
 					/>
 				</div>
-				{#if form?.errors?.password}
+				{#if form?.errors && 'password' in form.errors && form.errors.password}
 					<p class="text-sm text-red-500">{form.errors.password}</p>
 				{/if}
 			</div>
@@ -80,11 +80,11 @@
 			<div class="flex items-center space-x-2">
 				<Checkbox id="remember" name="remember" bind:checked={rememberMe} disabled={isLoading} />
 				<Label for="remember" class="text-sm font-normal cursor-pointer">
-					Remember me for 30 days
+					Remember me
 				</Label>
 			</div>
 			
-			{#if form?.errors?.general}
+			{#if form?.errors && 'general' in form.errors && form.errors.general}
 				<div class="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950 rounded-md">
 					{form.errors.general}
 				</div>

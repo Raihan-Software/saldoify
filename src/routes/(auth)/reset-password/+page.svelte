@@ -119,7 +119,7 @@
 							</p>
 						</div>
 					{/if}
-					{#if form?.errors?.password}
+					{#if form?.errors && 'password' in form.errors && form.errors.password}
 						<p class="text-sm text-red-500">{form.errors.password}</p>
 					{/if}
 				</div>
@@ -139,7 +139,7 @@
 							required
 						/>
 					</div>
-					{#if form?.errors?.confirmPassword}
+					{#if form?.errors && 'confirmPassword' in form.errors && form.errors.confirmPassword}
 						<p class="text-sm text-red-500">{form.errors.confirmPassword}</p>
 					{/if}
 					{#if confirmPassword && password !== confirmPassword}
@@ -147,7 +147,7 @@
 					{/if}
 				</div>
 				
-				{#if form?.errors?.general}
+				{#if form?.errors && 'general' in form.errors && form.errors.general}
 					<div class="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950 rounded-md">
 						{form.errors.general}
 					</div>

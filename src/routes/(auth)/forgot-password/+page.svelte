@@ -88,7 +88,7 @@
 					{/if}
 				</div>
 				
-				{#if form?.errors?.general}
+				{#if form?.errors && 'general' in form.errors && form.errors.general}
 					<div class="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950 rounded-md">
 						{form.errors.general}
 					</div>
