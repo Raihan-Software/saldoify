@@ -4,6 +4,9 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Plus, Edit, Trash2, TrendingUp, TrendingDown, Wallet } from '@lucide/svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
 	import { 
 		mockLiquidAssets, 
 		calculateTotalLiquidAssets, 
@@ -13,6 +16,17 @@
 
 	let assets = $state(mockLiquidAssets);
 	let totalBalance = $derived(calculateTotalLiquidAssets(assets));
+	let showAddModal = $state(false);
+	
+	// Form state
+	let formData = $state({
+		name: '',
+		type: 'savings' as LiquidAsset['type'],
+		institution: '',
+		accountNumber: '',
+		balance: '',
+		notes: ''
+	});
 	
 	// Calculate month-over-month change (mock data)
 	const lastMonthTotal = 115000000; // Mock previous month total
@@ -44,6 +58,43 @@
 			default: return 'default';
 		}
 	}
+	
+	function handleAddAsset() {
+		if (!formData.name || !formData.balance) return;
+		
+		const newAsset: LiquidAsset = {
+			id: Date.now().toString(),
+			name: formData.name,
+			type: formData.type,
+			institution: formData.institution || undefined,
+			accountNumber: formData.accountNumber || undefined,
+			balance: parseFloat(formData.balance),
+			currency: 'IDR',
+			lastUpdated: new Date(),
+			notes: formData.notes || undefined
+		};
+		
+		assets = [...assets, newAsset];
+		
+		// Reset form
+		formData = {
+			name: '',
+			type: 'savings',
+			institution: '',
+			accountNumber: '',
+			balance: '',
+			notes: ''
+		};
+		
+		showAddModal = false;
+	}
+	
+	function formatNumberInput(value: string): string {
+		// Remove all non-digit characters
+		const digits = value.replace(/\D/g, '');
+		// Format with thousand separators
+		return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+	}
 </script>
 
 <div class="container mx-auto p-6 space-y-6">
@@ -53,7 +104,7 @@
 			<h1 class="text-3xl font-bold">Liquid Assets</h1>
 			<p class="text-muted-foreground">Manage your cash and bank accounts</p>
 		</div>
-		<Button>
+		<Button onclick={() => showAddModal = true}>
 			<Plus class="mr-2 h-4 w-4" />
 			Add Asset
 		</Button>
@@ -153,3 +204,98 @@
 		</CardContent>
 	</Card>
 </div>
+
+<!-- Add Asset Modal -->
+<Dialog.Root bind:open={showAddModal}>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title>Add New Liquid Asset</Dialog.Title>
+			<Dialog.Description>
+				Add a new cash or bank account to track your liquid assets.
+			</Dialog.Description>
+		</Dialog.Header>
+		
+		<form onsubmit={(e) => { e.preventDefault(); handleAddAsset(); }} class="space-y-4">
+			<div class="space-y-2">
+				<Label for="name">Asset Name *</Label>
+				<Input
+					id="name"
+					placeholder="e.g., BCA Savings"
+					bind:value={formData.name}
+					required
+				/>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="type">Asset Type *</Label>
+				<select
+					id="type"
+					bind:value={formData.type}
+					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+				>
+					{#each Object.entries(liquidAssetTypes) as [value, { label, icon }]}
+						<option {value}>{icon} {label}</option>
+					{/each}
+				</select>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="institution">Institution</Label>
+				<Input
+					id="institution"
+					placeholder="e.g., Bank Central Asia"
+					bind:value={formData.institution}
+				/>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="accountNumber">Account Number</Label>
+				<Input
+					id="accountNumber"
+					placeholder="e.g., ****1234"
+					bind:value={formData.accountNumber}
+				/>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="balance">Current Balance *</Label>
+				<div class="relative">
+					<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+					<Input
+						id="balance"
+						type="text"
+						placeholder="0"
+						class="pl-10"
+						bind:value={formData.balance}
+						oninput={(e) => {
+							const target = e.currentTarget;
+							const value = target.value;
+							const formatted = formatNumberInput(value);
+							formData.balance = value.replace(/\D/g, '');
+							target.value = formatted;
+						}}
+						required
+					/>
+				</div>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="notes">Notes</Label>
+				<Input
+					id="notes"
+					placeholder="Optional notes..."
+					bind:value={formData.notes}
+				/>
+			</div>
+			
+			<Dialog.Footer>
+				<Button type="button" variant="outline" onclick={() => showAddModal = false}>
+					Cancel
+				</Button>
+				<Button type="submit">
+					Add Asset
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
