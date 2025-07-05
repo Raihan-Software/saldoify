@@ -105,10 +105,13 @@
 		<!-- Footer -->
 		<div class="border-t border-gray-200 dark:border-gray-800 p-4">
 			<div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
-				<p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Welcome back!</p>
-				<Button href="/demo/lucia" class="w-full bg-blue-600 hover:bg-blue-700 text-white border-0">
-					Demo Login
-				</Button>
+				<p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Demo User</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400 mb-3">demo@saldoify.com</p>
+				<form method="POST" action="/logout">
+					<Button type="submit" variant="outline" class="w-full">
+						Sign Out
+					</Button>
+				</form>
 			</div>
 		</div>
 	</div>
