@@ -437,69 +437,6 @@
 					</CardContent>
 				</Card>
 
-				<!-- Localization Settings -->
-				<Card class="border shadow-sm">
-					<CardHeader>
-						<CardTitle class="text-xl">Localization</CardTitle>
-						<CardDescription>Set your language and regional preferences</CardDescription>
-					</CardHeader>
-					<CardContent class="space-y-4">
-						<div class="grid gap-4">
-							<div class="grid gap-2">
-								<Label for="language">Language</Label>
-								<select
-									id="language"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="id" selected>Bahasa Indonesia</option>
-									<option value="en">English</option>
-									<option value="ms">Bahasa Melayu</option>
-									<option value="zh">中文 (Chinese)</option>
-									<option value="ja">日本語 (Japanese)</option>
-								</select>
-							</div>
-							<div class="grid gap-2">
-								<Label for="date-format">Date Format</Label>
-								<select
-									id="date-format"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="DD/MM/YYYY" selected>DD/MM/YYYY</option>
-									<option value="MM/DD/YYYY">MM/DD/YYYY</option>
-									<option value="YYYY-MM-DD">YYYY-MM-DD</option>
-									<option value="DD-MM-YYYY">DD-MM-YYYY</option>
-									<option value="DD.MM.YYYY">DD.MM.YYYY</option>
-								</select>
-							</div>
-							<div class="grid gap-2">
-								<Label for="time-format">Time Format</Label>
-								<select
-									id="time-format"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="24" selected>24 Hour (14:30)</option>
-									<option value="12">12 Hour (2:30 PM)</option>
-								</select>
-							</div>
-							<div class="grid gap-2">
-								<Label for="timezone">Timezone</Label>
-								<select
-									id="timezone"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="Asia/Jakarta" selected>Asia/Jakarta (WIB)</option>
-									<option value="Asia/Makassar">Asia/Makassar (WITA)</option>
-									<option value="Asia/Jayapura">Asia/Jayapura (WIT)</option>
-									<option value="Asia/Singapore">Asia/Singapore</option>
-									<option value="Asia/Tokyo">Asia/Tokyo</option>
-									<option value="Europe/London">Europe/London</option>
-									<option value="America/New_York">America/New York</option>
-								</select>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
 				<!-- Display Preferences -->
 				<Card class="border shadow-sm">
 					<CardHeader>
@@ -522,50 +459,10 @@
 							</div>
 							<div class="flex items-center justify-between">
 								<div class="space-y-0.5">
-									<Label for="show-decimals">Show Decimals</Label>
-									<p class="text-sm text-muted-foreground">Display decimal places for currency values</p>
-								</div>
-								<Switch id="show-decimals" bind:checked={showDecimals} />
-							</div>
-							<div class="flex items-center justify-between">
-								<div class="space-y-0.5">
 									<Label for="compact-numbers">Compact Numbers</Label>
 									<p class="text-sm text-muted-foreground">Show large numbers as 1.5M instead of 1,500,000</p>
 								</div>
 								<Switch id="compact-numbers" bind:checked={compactNumbers} />
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
-				<!-- Privacy & Security -->
-				<Card class="border shadow-sm">
-					<CardHeader>
-						<CardTitle class="text-xl">Privacy & Security</CardTitle>
-						<CardDescription>Manage your privacy and security settings</CardDescription>
-					</CardHeader>
-					<CardContent class="space-y-4">
-						<div class="grid gap-4">
-							<div class="flex items-center justify-between">
-								<div class="space-y-0.5">
-									<Label for="hide-balances">Hide Balances by Default</Label>
-									<p class="text-sm text-muted-foreground">Require click to show sensitive financial data</p>
-								</div>
-								<Switch id="hide-balances" bind:checked={hideBalances} />
-							</div>
-							<div class="flex items-center justify-between">
-								<div class="space-y-0.5">
-									<Label>Session Timeout</Label>
-									<p class="text-sm text-muted-foreground">Auto logout after period of inactivity</p>
-								</div>
-								<select
-									class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-								>
-									<option value="15">15 minutes</option>
-									<option value="30" selected>30 minutes</option>
-									<option value="60">1 hour</option>
-									<option value="never">Never</option>
-								</select>
 							</div>
 						</div>
 					</CardContent>
