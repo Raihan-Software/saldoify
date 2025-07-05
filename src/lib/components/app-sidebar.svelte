@@ -3,6 +3,8 @@
 	import { Home, Wallet, Receipt, Calculator, ChartLine, Settings, ChevronRight, Droplets, Building, TrendingUp, TrendingUpDown, CreditCard, Menu } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 
+	let { data } = $props();
+	
 	let assetsOpen = $state(false);
 	let sidebarOpen = $state(true);
 	
@@ -105,8 +107,8 @@
 		<!-- Footer -->
 		<div class="border-t border-gray-200 dark:border-gray-800 p-4">
 			<div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
-				<p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Demo User</p>
-				<p class="text-xs text-gray-500 dark:text-gray-400 mb-3">demo@saldoify.com</p>
+				<p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{data?.user?.name || 'User'}</p>
+				<p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{data?.user?.email || ''}</p>
 				<form method="POST" action="/logout">
 					<Button type="submit" variant="outline" class="w-full">
 						Sign Out
