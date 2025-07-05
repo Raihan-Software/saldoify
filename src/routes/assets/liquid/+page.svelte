@@ -7,6 +7,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import PageHeader from '$lib/components/page-header.svelte';
 	import { 
 		mockLiquidAssets, 
 		calculateTotalLiquidAssets, 
@@ -98,17 +99,15 @@
 </script>
 
 <div class="p-8 space-y-6">
+
 	<!-- Header -->
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-3xl font-bold">Liquid Assets</h1>
-			<p class="text-muted-foreground">Manage your cash and bank accounts</p>
-		</div>
-		<Button onclick={() => showAddModal = true}>
-			<Plus class="mr-2 h-4 w-4" />
-			Add Asset
-		</Button>
-	</div>
+	<PageHeader 
+		title="Liquid Assets"
+		description="Manage your cash and bank accounts"
+		actionLabel="Add Asset"
+		actionIcon={Plus}
+		onAction={() => showAddModal = true}
+	/>
 
 	<!-- Summary Cards -->
 	<div class="grid gap-4 md:grid-cols-2">

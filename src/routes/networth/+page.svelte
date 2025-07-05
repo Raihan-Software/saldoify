@@ -2,6 +2,7 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { Badge } from '$lib/components/ui/badge';
+	import PageHeader from '$lib/components/page-header.svelte';
 	import { 
 		calculateNetWorth,
 		groupAssetsByCategory,
@@ -35,10 +36,11 @@
 
 <div class="p-8 space-y-8">
 	<!-- Header -->
-	<div class="mb-8">
-		<h1 class="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">Net Worth</h1>
-		<p class="text-muted-foreground mt-2">Your complete financial picture at a glance</p>
-	</div>
+	<PageHeader 
+		title="Net Worth"
+		description="Your complete financial picture at a glance"
+		showAction={false}
+	/>
 
 	<!-- Hero Net Worth Card -->
 	<Card class="relative overflow-hidden border-0 bg-gradient-to-br from-blue-600 to-purple-600 text-white">

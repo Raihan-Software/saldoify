@@ -7,6 +7,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import PageHeader from '$lib/components/page-header.svelte';
 	import { 
 		mockInvestmentAssets, 
 		calculateTotalInvestmentAssets,
@@ -135,16 +136,13 @@
 
 <div class="p-8 space-y-6">
 	<!-- Header -->
-	<div class="flex items-center justify-between">
-		<div>
-			<h1 class="text-3xl font-bold">Investment Assets</h1>
-			<p class="text-muted-foreground">Manage your stocks, crypto, and other investments</p>
-		</div>
-		<Button onclick={() => showAddModal = true}>
-			<Plus class="mr-2 h-4 w-4" />
-			Add Investment
-		</Button>
-	</div>
+	<PageHeader 
+		title="Investment Assets"
+		description="Manage your stocks, crypto, and other investments"
+		actionLabel="Add Investment"
+		actionIcon={Plus}
+		onAction={() => showAddModal = true}
+	/>
 
 	<!-- Summary Cards -->
 	<div class="grid gap-4 md:grid-cols-3">

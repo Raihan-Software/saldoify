@@ -8,6 +8,7 @@
 	import { Plus, Edit2, Trash2, Save, X, Settings2, CreditCard, Wallet, Receipt, Tag } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Switch } from '$lib/components/ui/switch';
+	import PageHeader from '$lib/components/page-header.svelte';
 
 	// Import existing types
 	import { liabilityTypes } from '$lib/modules/networth/networth-data';
@@ -165,10 +166,11 @@
 <div class="min-h-screen">
 	<div class="container mx-auto p-6 lg:p-8">
 		<!-- Header -->
-		<div class="mb-8">
-			<h1 class="text-4xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-			<p class="text-muted-foreground mt-2 text-lg">Manage categories and types for your financial data</p>
-		</div>
+		<PageHeader 
+			title="Settings"
+			description="Manage categories and types for your financial data"
+			showAction={false}
+		/>
 
 		<!-- Settings Tabs -->
 		<Tabs value="general" class="w-full space-y-6">

@@ -3,15 +3,20 @@
 	import LiquidAssetCard from '$lib/modules/assets/liquid/liquid-asset-card.svelte';
 	import LiquidAssetsSummary from '$lib/modules/assets/liquid/liquid-assets-summary.svelte';
 	import { mockLiquidAssets } from '$lib/modules/assets/liquid/mock-data';
+	import PageHeader from '$lib/components/page-header.svelte';
+	import { Plus } from '@lucide/svelte';
 	
 	let liquidAssets = $state([...mockLiquidAssets]);
 </script>
 
 <div class="p-8 max-w-7xl">
-	<div class="mb-8">
-		<h1 class="text-3xl font-bold mb-2">Assets</h1>
-		<p class="text-muted-foreground">Manage and track your financial assets</p>
-	</div>
+	<PageHeader 
+		title="Assets"
+		description="Manage and track your financial assets"
+		actionLabel="Add Asset"
+		actionIcon={Plus}
+		onAction={() => {}}
+	/>
 
 	<div class="mb-8">
 		<LiquidAssetsSummary assets={liquidAssets} />

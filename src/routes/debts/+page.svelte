@@ -7,6 +7,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import PageHeader from '$lib/components/page-header.svelte';
 	import { mockLiabilities, liabilityTypes, type Liability } from '$lib/modules/networth/networth-data';
 
 	let debts = $state([...mockLiabilities]);
@@ -86,16 +87,13 @@
 
 <div class="p-8 space-y-8">
 	<!-- Header -->
-	<div class="flex items-center justify-between mb-8">
-		<div>
-			<h1 class="text-4xl font-bold bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">Debt Management</h1>
-			<p class="text-muted-foreground mt-2">Track and manage your liabilities</p>
-		</div>
-		<Button onclick={() => showAddModal = true}>
-			<Plus class="mr-2 h-4 w-4" />
-			Add Debt
-		</Button>
-	</div>
+	<PageHeader 
+		title="Debt Management"
+		description="Track and manage your liabilities"
+		actionLabel="Add Debt"
+		actionIcon={Plus}
+		onAction={() => showAddModal = true}
+	/>
 
 	<!-- Hero Debt Summary Card -->
 	<Card class="relative overflow-hidden border-0 bg-gradient-to-br from-red-600 to-orange-600 text-white">
