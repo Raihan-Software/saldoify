@@ -96,25 +96,46 @@ docker-compose exec app npm run db:push
 docker-compose exec app npm run db:studio
 ```
 
-## Development with Docker (Live Reload)
+## Development with Docker (PostgreSQL only)
 
-For development with hot reload and live changes:
+For development, run PostgreSQL in Docker and the app locally:
 
+### 1. Start PostgreSQL
 ```bash
-# Start development environment
-docker-compose -f docker-compose.dev.yml up
-
-# Or run in background
+# Start PostgreSQL in background
 docker-compose -f docker-compose.dev.yml up -d
 ```
 
-This will:
-- Mount your local code into the container
-- Enable hot reload on file changes
-- Run the development server on http://localhost:5173
-- Keep PostgreSQL on port 5436
+This will start PostgreSQL on port 5436.
 
-To stop the development environment:
+### 2. Set up your .env file
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set:
+```
+DATABASE_URL="postgresql://saldoify:saldoify_password@localhost:5436/saldoify"
+```
+
+### 3. Install dependencies
+```bash
+npm install
+```
+
+### 4. Run database migrations
+```bash
+npm run db:push
+```
+
+### 5. Start development server
+```bash
+npm run dev
+```
+
+The app will run on http://localhost:5173 with hot reload enabled.
+
+To stop PostgreSQL:
 ```bash
 docker-compose -f docker-compose.dev.yml down
 ```
