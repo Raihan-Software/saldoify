@@ -4,28 +4,41 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import { 
-		calculateNetWorth,
-		groupAssetsByCategory,
-		groupLiabilitiesByType,
 		liabilityTypes,
 		mockLiabilities
 	} from '$lib/modules/networth/networth-data';
-	import { liquidAssetTypes } from '$lib/modules/assets/liquid/liquid-assets-data';
-	import { nonLiquidAssetTypes } from '$lib/modules/assets/non-liquid/non-liquid-assets-data';
-	import { investmentAssetTypes } from '$lib/modules/assets/investment/investment-assets-data';
+	import type { PageData } from './$types';
 
-	// Calculate net worth and get grouped data
-	let netWorthData = $derived(calculateNetWorth());
-	let groupedAssets = $derived(groupAssetsByCategory());
-	let groupedLiabilities = $derived(groupLiabilitiesByType());
+	let { data }: { data: PageData } = $props();
 
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('id-ID', {
+	// Calculate net worth from real database data
+	let netWorthData = $derived({
+		assets: {
+			liquid: data.summaries.liquid.totalValue,
+			nonLiquid: data.summaries.nonLiquid.totalValue,
+			investment: data.summaries.investment.totalValue,
+			total: data.summaries.liquid.totalValue + data.summaries.nonLiquid.totalValue + data.summaries.investment.totalValue
+		},
+		liabilities: {
+			total: mockLiabilities.reduce((sum, liability) => sum + liability.balance, 0)
+		},
+		netWorth: (data.summaries.liquid.totalValue + data.summaries.nonLiquid.totalValue + data.summaries.investment.totalValue) - mockLiabilities.reduce((sum, liability) => sum + liability.balance, 0)
+	});
+
+	// Format currency for display
+	function displayCurrency(value: number): string {
+		const formatter = new Intl.NumberFormat('en-US', {
 			style: 'currency',
-			currency: 'IDR',
+			currency: data.preferences?.currencyCode || 'USD',
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 0
-		}).format(amount);
+		});
+		
+		if (data.preferences?.currencyDisplay === 'code') {
+			return formatter.format(value).replace(/[A-Z]{3}/, data.preferences.currencyCode);
+		}
+		
+		return formatter.format(value);
 	}
 
 	function formatPercentage(value: number, total: number): string {
@@ -48,16 +61,16 @@
 			<div class="relative z-10">
 				<p class="text-sm opacity-90 mb-2">As of {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 				<p class="text-lg font-medium mb-4">Your Net Worth</p>
-				<p class="text-5xl font-bold mb-8">{formatCurrency(netWorthData.netWorth)}</p>
+				<p class="text-5xl font-bold mb-8">{displayCurrency(netWorthData.netWorth)}</p>
 				
 				<div class="grid grid-cols-2 gap-8">
 					<div>
 						<p class="text-sm opacity-90 mb-1">Total Assets</p>
-						<p class="text-2xl font-semibold">{formatCurrency(netWorthData.assets.total)}</p>
+						<p class="text-2xl font-semibold">{displayCurrency(netWorthData.assets.total)}</p>
 					</div>
 					<div>
 						<p class="text-sm opacity-90 mb-1">Total Liabilities</p>
-						<p class="text-2xl font-semibold">{formatCurrency(netWorthData.liabilities.total)}</p>
+						<p class="text-2xl font-semibold">{displayCurrency(netWorthData.liabilities.total)}</p>
 					</div>
 				</div>
 			</div>
@@ -72,7 +85,7 @@
 		<Card class="border-0 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900">
 			<CardContent class="p-6">
 				<p class="text-sm font-medium text-green-700 dark:text-green-300 mb-1">Liquid Assets</p>
-				<p class="text-2xl font-bold text-green-800 dark:text-green-200">{formatCurrency(netWorthData.assets.liquid)}</p>
+				<p class="text-2xl font-bold text-green-800 dark:text-green-200">{displayCurrency(netWorthData.assets.liquid)}</p>
 				<p class="text-xs text-green-600 dark:text-green-400 mt-1">
 					{formatPercentage(netWorthData.assets.liquid, netWorthData.assets.total)} of assets
 				</p>
@@ -82,7 +95,7 @@
 		<Card class="border-0 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900">
 			<CardContent class="p-6">
 				<p class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Investments</p>
-				<p class="text-2xl font-bold text-blue-800 dark:text-blue-200">{formatCurrency(netWorthData.assets.investment)}</p>
+				<p class="text-2xl font-bold text-blue-800 dark:text-blue-200">{displayCurrency(netWorthData.assets.investment)}</p>
 				<p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
 					{formatPercentage(netWorthData.assets.investment, netWorthData.assets.total)} of assets
 				</p>
@@ -91,8 +104,8 @@
 		
 		<Card class="border-0 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900">
 			<CardContent class="p-6">
-				<p class="text-sm font-medium text-purple-700 dark:text-purple-300 mb-1">Properties</p>
-				<p class="text-2xl font-bold text-purple-800 dark:text-purple-200">{formatCurrency(netWorthData.assets.nonLiquid)}</p>
+				<p class="text-sm font-medium text-purple-700 dark:text-purple-300 mb-1">Non-Liquid Assets</p>
+				<p class="text-2xl font-bold text-purple-800 dark:text-purple-200">{displayCurrency(netWorthData.assets.nonLiquid)}</p>
 				<p class="text-xs text-purple-600 dark:text-purple-400 mt-1">
 					{formatPercentage(netWorthData.assets.nonLiquid, netWorthData.assets.total)} of assets
 				</p>
@@ -134,29 +147,33 @@
 							<CardDescription>Cash and easily accessible funds</CardDescription>
 						</div>
 						<span class="text-lg font-semibold text-green-600">
-							{formatCurrency(netWorthData.assets.liquid)}
+							{displayCurrency(netWorthData.assets.liquid)}
 						</span>
 					</div>
 				</CardHeader>
 				<CardContent>
-					<div class="space-y-3">
-						{#each groupedAssets.liquid as asset}
-							<div class="flex justify-between items-center py-2 border-b last:border-0">
-								<div class="flex items-center gap-3">
-									<div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs">
-										{liquidAssetTypes[asset.type]?.icon || '💰'}
+					{#if data.assets.liquid.length === 0}
+						<p class="text-sm text-muted-foreground text-center py-4">No liquid assets found</p>
+					{:else}
+						<div class="space-y-3">
+							{#each data.assets.liquid as asset}
+								<div class="flex justify-between items-center py-2 border-b last:border-0">
+									<div class="flex items-center gap-3">
+										<div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs">
+											{asset.assetType?.icon || '💰'}
+										</div>
+										<span class="font-medium">{asset.name}</span>
 									</div>
-									<span class="font-medium">{asset.name}</span>
+									<div class="text-right">
+										<p class="font-semibold">{displayCurrency(parseFloat(asset.currentValue))}</p>
+										<p class="text-xs text-muted-foreground">
+											{formatPercentage(parseFloat(asset.currentValue), netWorthData.assets.total)}
+										</p>
+									</div>
 								</div>
-								<div class="text-right">
-									<p class="font-semibold">{formatCurrency(asset.balance)}</p>
-									<p class="text-xs text-muted-foreground">
-										{formatPercentage(asset.balance, netWorthData.assets.total)}
-									</p>
-								</div>
-							</div>
-						{/each}
-					</div>
+							{/each}
+						</div>
+					{/if}
 				</CardContent>
 			</Card>
 
@@ -171,34 +188,38 @@
 							<CardDescription>Stocks, crypto, and funds</CardDescription>
 						</div>
 						<span class="text-lg font-semibold text-blue-600">
-							{formatCurrency(netWorthData.assets.investment)}
+							{displayCurrency(netWorthData.assets.investment)}
 						</span>
 					</div>
 				</CardHeader>
 				<CardContent>
-					<div class="space-y-3">
-						{#each groupedAssets.investment as asset}
-							<div class="flex justify-between items-center py-2 border-b last:border-0">
-								<div class="flex items-center gap-3">
-									<div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs">
-										{investmentAssetTypes[asset.type]?.icon || '💹'}
+					{#if data.assets.investment.length === 0}
+						<p class="text-sm text-muted-foreground text-center py-4">No investments found</p>
+					{:else}
+						<div class="space-y-3">
+							{#each data.assets.investment as asset}
+								<div class="flex justify-between items-center py-2 border-b last:border-0">
+									<div class="flex items-center gap-3">
+										<div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs">
+											{asset.assetType?.icon || '💹'}
+										</div>
+										<div>
+											<span class="font-medium">{asset.name}</span>
+											{#if asset.ticker}
+												<span class="text-xs text-muted-foreground ml-1">{asset.ticker}</span>
+											{/if}
+										</div>
 									</div>
-									<div>
-										<span class="font-medium">{asset.name}</span>
-										{#if asset.ticker}
-											<span class="text-xs text-muted-foreground ml-1">{asset.ticker}</span>
-										{/if}
+									<div class="text-right">
+										<p class="font-semibold">{displayCurrency(parseFloat(asset.currentValue))}</p>
+										<p class="text-xs text-muted-foreground">
+											{formatPercentage(parseFloat(asset.currentValue), netWorthData.assets.total)}
+										</p>
 									</div>
 								</div>
-								<div class="text-right">
-									<p class="font-semibold">{formatCurrency(asset.currentPrice * asset.quantity)}</p>
-									<p class="text-xs text-muted-foreground">
-										{formatPercentage(asset.currentPrice * asset.quantity, netWorthData.assets.total)}
-									</p>
-								</div>
-							</div>
-						{/each}
-					</div>
+							{/each}
+						</div>
+					{/if}
 				</CardContent>
 			</Card>
 
@@ -208,34 +229,38 @@
 					<div class="flex items-center justify-between">
 						<div>
 							<CardTitle class="text-lg flex items-center gap-2">
-								🏠 Properties & Assets
+								🏠 Non-Liquid Assets
 							</CardTitle>
 							<CardDescription>Real estate, vehicles, valuables</CardDescription>
 						</div>
 						<span class="text-lg font-semibold text-purple-600">
-							{formatCurrency(netWorthData.assets.nonLiquid)}
+							{displayCurrency(netWorthData.assets.nonLiquid)}
 						</span>
 					</div>
 				</CardHeader>
 				<CardContent>
-					<div class="space-y-3">
-						{#each groupedAssets.nonLiquid as asset}
-							<div class="flex justify-between items-center py-2 border-b last:border-0">
-								<div class="flex items-center gap-3">
-									<div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs">
-										{nonLiquidAssetTypes[asset.type]?.icon || '🏢'}
+					{#if data.assets.nonLiquid.length === 0}
+						<p class="text-sm text-muted-foreground text-center py-4">No non-liquid assets found</p>
+					{:else}
+						<div class="space-y-3">
+							{#each data.assets.nonLiquid as asset}
+								<div class="flex justify-between items-center py-2 border-b last:border-0">
+									<div class="flex items-center gap-3">
+										<div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs">
+											{asset.assetType?.icon || '🏢'}
+										</div>
+										<span class="font-medium">{asset.name}</span>
 									</div>
-									<span class="font-medium">{asset.name}</span>
+									<div class="text-right">
+										<p class="font-semibold">{displayCurrency(parseFloat(asset.currentValue))}</p>
+										<p class="text-xs text-muted-foreground">
+											{formatPercentage(parseFloat(asset.currentValue), netWorthData.assets.total)}
+										</p>
+									</div>
 								</div>
-								<div class="text-right">
-									<p class="font-semibold">{formatCurrency(asset.currentValue)}</p>
-									<p class="text-xs text-muted-foreground">
-										{formatPercentage(asset.currentValue, netWorthData.assets.total)}
-									</p>
-								</div>
-							</div>
-						{/each}
-					</div>
+							{/each}
+						</div>
+					{/if}
 				</CardContent>
 			</Card>
 
@@ -261,7 +286,7 @@
 							<CardDescription>Loans, mortgages, and credit</CardDescription>
 						</div>
 						<span class="text-lg font-semibold text-red-600">
-							{formatCurrency(netWorthData.liabilities.total)}
+							{displayCurrency(netWorthData.liabilities.total)}
 						</span>
 					</div>
 				</CardHeader>
@@ -279,14 +304,14 @@
 											<p class="text-xs text-muted-foreground">
 												{liability.interestRate}% APR
 												{#if liability.monthlyPayment}
-													• {formatCurrency(liability.monthlyPayment)}/mo
+													• {displayCurrency(liability.monthlyPayment)}/mo
 												{/if}
 											</p>
 										{/if}
 									</div>
 								</div>
 								<div class="text-right">
-									<p class="font-semibold text-red-600">{formatCurrency(liability.balance)}</p>
+									<p class="font-semibold text-red-600">{displayCurrency(liability.balance)}</p>
 									<p class="text-xs text-muted-foreground">
 										{formatPercentage(liability.balance, netWorthData.liabilities.total)}
 									</p>
