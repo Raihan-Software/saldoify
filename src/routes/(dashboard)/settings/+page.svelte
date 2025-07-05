@@ -1,80 +1,29 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import { Plus, Edit2, Trash2, Save, X, Settings2, CreditCard, Wallet, Receipt, Tag } from '@lucide/svelte';
+	import { Plus, Edit2, Trash2, Save, X, Settings2, CreditCard, Wallet, Receipt, Tag, Loader2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Switch } from '$lib/components/ui/switch';
 	import PageHeader from '$lib/components/page-header.svelte';
+	import type { PageData, ActionData } from './$types';
+	
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	// Import existing types
-	import { liabilityTypes } from '$lib/modules/networth/networth-data';
 	import { liquidAssetTypes } from '$lib/modules/assets/liquid/liquid-assets-data';
 	import { nonLiquidAssetTypes } from '$lib/modules/assets/non-liquid/non-liquid-assets-data';
 	import { investmentAssetTypes } from '$lib/modules/assets/investment/investment-assets-data';
 	import { transactionCategories } from '$lib/modules/transactions/transactions-data';
 
-	// State for managing types with additional mock data
-	let debtTypes = $state([
-		...Object.entries(liabilityTypes).map(([key, value]) => ({ id: key, ...value })),
-		{ id: 'business-loan', label: 'Business Loan', icon: '🏢' },
-		{ id: 'education-loan', label: 'Education Loan', icon: '🎓' },
-		{ id: 'payday-loan', label: 'Payday Loan', icon: '📅' }
-	]);
-	
-	let assetTypes = $state({
-		liquid: [
-			...Object.entries(liquidAssetTypes).map(([key, value]) => ({ id: key, ...value })),
-			{ id: 'crypto-wallet', label: 'Crypto Wallet', icon: '🔐' },
-			{ id: 'e-wallet', label: 'E-Wallet', icon: '📱' },
-			{ id: 'foreign-currency', label: 'Foreign Currency', icon: '💱' }
-		],
-		nonLiquid: [
-			...Object.entries(nonLiquidAssetTypes).map(([key, value]) => ({ id: key, ...value })),
-			{ id: 'furniture', label: 'Furniture', icon: '🪑' },
-			{ id: 'appliances', label: 'Home Appliances', icon: '🏠' },
-			{ id: 'books', label: 'Book Collection', icon: '📚' },
-			{ id: 'art', label: 'Art & Paintings', icon: '🖼️' }
-		],
-		investment: [
-			...Object.entries(investmentAssetTypes).map(([key, value]) => ({ id: key, ...value })),
-			{ id: 'reit', label: 'REITs', icon: '🏘️' },
-			{ id: 'p2p-lending', label: 'P2P Lending', icon: '🤝' },
-			{ id: 'gold-account', label: 'Gold Account', icon: '🥇' },
-			{ id: 'forex', label: 'Forex', icon: '💱' }
-		]
-	});
-	
-	let transactionCats = $state({
-		income: [
-			...Object.entries(transactionCategories.income.types).map(([key, value]) => ({ id: key, label: value })),
-			{ id: 'bonus', label: 'Bonus' },
-			{ id: 'rental', label: 'Rental Income' },
-			{ id: 'business', label: 'Business Income' },
-			{ id: 'interest', label: 'Interest Income' },
-			{ id: 'cashback', label: 'Cashback & Rewards' }
-		],
-		expense: [
-			...Object.entries(transactionCategories.expense.types).map(([key, value]) => ({ id: key, label: value })),
-			{ id: 'rent', label: 'Rent' },
-			{ id: 'insurance', label: 'Insurance' },
-			{ id: 'subscription', label: 'Subscriptions' },
-			{ id: 'personal-care', label: 'Personal Care' },
-			{ id: 'pet', label: 'Pet Expenses' },
-			{ id: 'donation', label: 'Donations' },
-			{ id: 'tax', label: 'Taxes' },
-			{ id: 'household', label: 'Household Items' }
-		],
-		transfer: [
-			...Object.entries(transactionCategories.transfer.types).map(([key, value]) => ({ id: key, label: value })),
-			{ id: 'loan-payment', label: 'Loan Payment' },
-			{ id: 'family', label: 'Family Transfer' },
-			{ id: 'emergency-fund', label: 'Emergency Fund' }
-		]
-	});
+	// State for managing types - all types now come from database
+	let debtTypes = $state(data.debtTypes || []);
+	let assetTypes = $state(data.assetTypes || { liquid: [], non_liquid: [], investment: [] });
+	let transactionCats = $state(data.transactionCategories || { income: [], expense: [], transfer: [] });
 
 	// Edit states
 	let editingDebt = $state<string | null>(null);
@@ -85,7 +34,7 @@
 	let showAddDebtType = $state(false);
 	let showAddAssetType = $state(false);
 	let showAddTransactionType = $state(false);
-	let selectedAssetCategory = $state<'liquid' | 'nonLiquid' | 'investment'>('liquid');
+	let selectedAssetCategory = $state<'liquid' | 'non_liquid' | 'investment'>('liquid');
 	let selectedTransactionCategory = $state<'income' | 'expense' | 'transfer'>('income');
 
 	// Form data for new items
@@ -93,72 +42,128 @@
 	let newAssetType = $state({ label: '', icon: '' });
 	let newTransactionType = $state({ label: '' });
 	
-	// General settings states
-	let showDecimals = $state(true);
-	let compactNumbers = $state(false);
-	let hideBalances = $state(false);
+	// General settings states - initialize from server data
+	let currency = $state(data?.preferences?.currencyCode || 'IDR');
+	let currencyDisplay = $state(data?.preferences?.currencyDisplay || 'symbol');
+	let numberFormat = $state(data?.preferences?.numberFormat || '1.234.567,89');
+	let compactNumbers = $state(data?.preferences?.compactNumbers || false);
+	let isLoading = $state(false);
 
 	// Helper functions
-	function saveDebtType(id: string, newLabel: string) {
-		const index = debtTypes.findIndex(dt => dt.id === id);
-		if (index !== -1) {
-			debtTypes[index].label = newLabel;
-		}
-		editingDebt = null;
-	}
-
-	function deleteDebtType(id: string) {
-		debtTypes = debtTypes.filter(dt => dt.id !== id);
-	}
-
-	function addDebtType() {
-		if (newDebtType.label && newDebtType.icon) {
-			const id = newDebtType.label.toLowerCase().replace(/\s+/g, '-');
-			debtTypes = [...debtTypes, { id, label: newDebtType.label, icon: newDebtType.icon }];
-			newDebtType = { label: '', icon: '' };
-			showAddDebtType = false;
+	async function saveDebtType(id: string, newLabel: string) {
+		const formData = new FormData();
+		formData.append('id', id);
+		formData.append('label', newLabel);
+		
+		const response = await fetch('?/updateDebtType', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			const index = debtTypes.findIndex(dt => dt.id === id);
+			if (index !== -1) {
+				debtTypes[index].label = newLabel;
+			}
+			editingDebt = null;
 		}
 	}
 
-	function saveAssetType(category: string, id: string, newLabel: string) {
-		const index = assetTypes[category as keyof typeof assetTypes].findIndex(at => at.id === id);
-		if (index !== -1) {
-			assetTypes[category as keyof typeof assetTypes][index].label = newLabel;
+	async function deleteDebtType(id: string) {
+		const debtType = debtTypes.find(dt => dt.id === id);
+		if (debtType?.isSystem) {
+			alert('Cannot delete system debt types');
+			return;
 		}
-		editingAsset = null;
-	}
-
-	function deleteAssetType(category: string, id: string) {
-		assetTypes[category as keyof typeof assetTypes] = assetTypes[category as keyof typeof assetTypes].filter(at => at.id !== id);
-	}
-
-	function addAssetType() {
-		if (newAssetType.label && newAssetType.icon) {
-			const id = newAssetType.label.toLowerCase().replace(/\s+/g, '-');
-			assetTypes[selectedAssetCategory] = [...assetTypes[selectedAssetCategory], { id, label: newAssetType.label, icon: newAssetType.icon }];
-			newAssetType = { label: '', icon: '' };
-			showAddAssetType = false;
+		
+		const formData = new FormData();
+		formData.append('id', id);
+		
+		const response = await fetch('?/deleteDebtType', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			debtTypes = debtTypes.filter(dt => dt.id !== id);
 		}
 	}
 
-	function saveTransactionType(category: string, id: string, newLabel: string) {
-		const index = transactionCats[category as keyof typeof transactionCats].findIndex(tt => tt.id === id);
-		if (index !== -1) {
-			transactionCats[category as keyof typeof transactionCats][index].label = newLabel;
+	async function saveAssetType(category: string, id: string, newLabel: string) {
+		const formData = new FormData();
+		formData.append('id', id);
+		formData.append('label', newLabel);
+		
+		const response = await fetch('?/updateAssetType', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			const index = assetTypes[category as keyof typeof assetTypes].findIndex(at => at.id === id);
+			if (index !== -1) {
+				assetTypes[category as keyof typeof assetTypes][index].label = newLabel;
+			}
+			editingAsset = null;
 		}
-		editingTransaction = null;
 	}
 
-	function deleteTransactionType(category: string, id: string) {
-		transactionCats[category as keyof typeof transactionCats] = transactionCats[category as keyof typeof transactionCats].filter(tt => tt.id !== id);
+	async function deleteAssetType(category: string, id: string) {
+		const assetType = assetTypes[category as keyof typeof assetTypes].find(at => at.id === id);
+		if (assetType?.isSystem) {
+			alert('Cannot delete system asset types');
+			return;
+		}
+		
+		const formData = new FormData();
+		formData.append('id', id);
+		
+		const response = await fetch('?/deleteAssetType', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			assetTypes[category as keyof typeof assetTypes] = assetTypes[category as keyof typeof assetTypes].filter(at => at.id !== id);
+		}
 	}
 
-	function addTransactionType() {
-		if (newTransactionType.label) {
-			const id = newTransactionType.label.toLowerCase().replace(/\s+/g, '-');
-			transactionCats[selectedTransactionCategory] = [...transactionCats[selectedTransactionCategory], { id, label: newTransactionType.label }];
-			newTransactionType = { label: '' };
-			showAddTransactionType = false;
+	async function saveTransactionType(category: string, id: string, newLabel: string) {
+		const formData = new FormData();
+		formData.append('id', id);
+		formData.append('label', newLabel);
+		
+		const response = await fetch('?/updateTransactionCategory', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			const index = transactionCats[category as keyof typeof transactionCats].findIndex(tt => tt.id === id);
+			if (index !== -1) {
+				transactionCats[category as keyof typeof transactionCats][index].label = newLabel;
+			}
+			editingTransaction = null;
+		}
+	}
+
+	async function deleteTransactionType(category: string, id: string) {
+		const transactionType = transactionCats[category as keyof typeof transactionCats].find(tt => tt.id === id);
+		if (transactionType?.isSystem) {
+			alert('Cannot delete system transaction categories');
+			return;
+		}
+		
+		const formData = new FormData();
+		formData.append('id', id);
+		
+		const response = await fetch('?/deleteTransactionCategory', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			transactionCats[category as keyof typeof transactionCats] = transactionCats[category as keyof typeof transactionCats].filter(tt => tt.id !== id);
 		}
 	}
 </script>
@@ -230,6 +235,9 @@
 										/>
 									{:else}
 										<span class="font-medium">{debtType.label}</span>
+										{#if debtType.isSystem}
+											<Badge variant="secondary" class="ml-2">System</Badge>
+										{/if}
 									{/if}
 								</div>
 								<div class="flex items-center gap-2">
@@ -238,12 +246,14 @@
 											<X class="h-4 w-4" />
 										</Button>
 									{:else}
-										<Button size="icon" variant="ghost" onclick={() => editingDebt = debtType.id}>
-											<Edit2 class="h-4 w-4" />
-										</Button>
-										<Button size="icon" variant="ghost" onclick={() => deleteDebtType(debtType.id)}>
-											<Trash2 class="h-4 w-4" />
-										</Button>
+										{#if !debtType.isSystem}
+											<Button size="icon" variant="ghost" onclick={() => editingDebt = debtType.id}>
+												<Edit2 class="h-4 w-4" />
+											</Button>
+											<Button size="icon" variant="ghost" onclick={() => deleteDebtType(debtType.id)}>
+												<Trash2 class="h-4 w-4" />
+											</Button>
+										{/if}
 									{/if}
 								</div>
 							</div>
@@ -272,7 +282,7 @@
 					<Tabs value="liquid" class="w-full">
 						<TabsList class="grid grid-cols-3 w-full mb-4">
 							<TabsTrigger value="liquid">Liquid Assets</TabsTrigger>
-							<TabsTrigger value="nonLiquid">Non-Liquid Assets</TabsTrigger>
+							<TabsTrigger value="non_liquid">Non-Liquid Assets</TabsTrigger>
 							<TabsTrigger value="investment">Investments</TabsTrigger>
 						</TabsList>
 						
@@ -298,6 +308,9 @@
 												/>
 											{:else}
 												<span class="font-medium">{assetType.label}</span>
+												{#if assetType.isSystem}
+													<Badge variant="secondary" class="ml-2">System</Badge>
+												{/if}
 											{/if}
 										</div>
 										<div class="flex items-center gap-2">
@@ -306,12 +319,14 @@
 													<X class="h-4 w-4" />
 												</Button>
 											{:else}
-												<Button size="icon" variant="ghost" onclick={() => editingAsset = { type: category, id: assetType.id }}>
-													<Edit2 class="h-4 w-4" />
-												</Button>
-												<Button size="icon" variant="ghost" onclick={() => deleteAssetType(category, assetType.id)}>
-													<Trash2 class="h-4 w-4" />
-												</Button>
+												{#if !assetType.isSystem}
+													<Button size="icon" variant="ghost" onclick={() => editingAsset = { type: category, id: assetType.id }}>
+														<Edit2 class="h-4 w-4" />
+													</Button>
+													<Button size="icon" variant="ghost" onclick={() => deleteAssetType(category, assetType.id)}>
+														<Trash2 class="h-4 w-4" />
+													</Button>
+												{/if}
 											{/if}
 										</div>
 									</div>
@@ -370,6 +385,9 @@
 												/>
 											{:else}
 												<span class="font-medium">{transType.label}</span>
+												{#if transType.isSystem}
+													<Badge variant="secondary" class="ml-2">System</Badge>
+												{/if}
 											{/if}
 										</div>
 										<div class="flex items-center gap-2">
@@ -378,12 +396,14 @@
 													<X class="h-4 w-4" />
 												</Button>
 											{:else}
-												<Button size="icon" variant="ghost" onclick={() => editingTransaction = { category, id: transType.id }}>
-													<Edit2 class="h-4 w-4" />
-												</Button>
-												<Button size="icon" variant="ghost" onclick={() => deleteTransactionType(category, transType.id)}>
-													<Trash2 class="h-4 w-4" />
-												</Button>
+												{#if !transType.isSystem}
+													<Button size="icon" variant="ghost" onclick={() => editingTransaction = { category, id: transType.id }}>
+														<Edit2 class="h-4 w-4" />
+													</Button>
+													<Button size="icon" variant="ghost" onclick={() => deleteTransactionType(category, transType.id)}>
+														<Trash2 class="h-4 w-4" />
+													</Button>
+												{/if}
 											{/if}
 										</div>
 									</div>
@@ -397,85 +417,114 @@
 
 		<!-- General Settings Tab -->
 		<TabsContent value="general" class="mt-6">
-			<div class="grid gap-6">
-				<!-- Currency Settings -->
-				<Card class="border shadow-sm">
-					<CardHeader>
-						<CardTitle class="text-xl">Currency Settings</CardTitle>
-						<CardDescription>Configure your default currency and display preferences</CardDescription>
-					</CardHeader>
-					<CardContent class="space-y-4">
-						<div class="grid gap-4">
-							<div class="grid gap-2">
-								<Label for="currency">Default Currency</Label>
-								<select
-									id="currency"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="IDR" selected>IDR - Indonesian Rupiah</option>
-									<option value="USD">USD - US Dollar</option>
-									<option value="EUR">EUR - Euro</option>
-									<option value="SGD">SGD - Singapore Dollar</option>
-									<option value="MYR">MYR - Malaysian Ringgit</option>
-									<option value="JPY">JPY - Japanese Yen</option>
-									<option value="GBP">GBP - British Pound</option>
-									<option value="AUD">AUD - Australian Dollar</option>
-								</select>
-							</div>
-							<div class="grid gap-2">
-								<Label for="currency-display">Currency Display</Label>
-								<select
-									id="currency-display"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="symbol" selected>Symbol (Rp)</option>
-									<option value="code">Code (IDR)</option>
-									<option value="both">Both (IDR Rp)</option>
-								</select>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
-				<!-- Display Preferences -->
-				<Card class="border shadow-sm">
-					<CardHeader>
-						<CardTitle class="text-xl">Display Preferences</CardTitle>
-						<CardDescription>Customize how information is displayed</CardDescription>
-					</CardHeader>
-					<CardContent class="space-y-4">
-						<div class="grid gap-4">
-							<div class="grid gap-2">
-								<Label for="number-format">Number Format</Label>
-								<select
-									id="number-format"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="1.234.567,89" selected>1.234.567,89 (Indonesia)</option>
-									<option value="1,234,567.89">1,234,567.89 (US/UK)</option>
-									<option value="1 234 567,89">1 234 567,89 (France)</option>
-									<option value="1'234'567.89">1'234'567.89 (Switzerland)</option>
-								</select>
-							</div>
-							<div class="flex items-center justify-between">
-								<div class="space-y-0.5">
-									<Label for="compact-numbers">Compact Numbers</Label>
-									<p class="text-sm text-muted-foreground">Show large numbers as 1.5M instead of 1,500,000</p>
+			<form 
+				method="POST"
+				action="?/updatePreferences"
+				use:enhance={() => {
+					isLoading = true;
+					return async ({ update }) => {
+						await update();
+						isLoading = false;
+					};
+				}}
+			>
+				<div class="grid gap-6">
+					<!-- Currency Settings -->
+					<Card class="border shadow-sm">
+						<CardHeader>
+							<CardTitle class="text-xl">Currency Settings</CardTitle>
+							<CardDescription>Configure your default currency and display preferences</CardDescription>
+						</CardHeader>
+						<CardContent class="space-y-4">
+							<div class="grid gap-4">
+								<div class="grid gap-2">
+									<Label for="currency">Default Currency</Label>
+									<select
+										id="currency"
+										name="currency"
+										bind:value={currency}
+										class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+									>
+										{#each data.currencies as curr}
+											<option value={curr.code}>{curr.code} - {curr.name}</option>
+										{/each}
+									</select>
 								</div>
-								<Switch id="compact-numbers" bind:checked={compactNumbers} />
+								<div class="grid gap-2">
+									<Label for="currency-display">Currency Display</Label>
+									<select
+										id="currency-display"
+										name="currency-display"
+										bind:value={currencyDisplay}
+										class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+									>
+										<option value="symbol">Symbol ({data.currencies.find(c => c.code === currency)?.symbol || '$'})</option>
+										<option value="code">Code ({currency})</option>
+										<option value="both">Both ({currency} {data.currencies.find(c => c.code === currency)?.symbol || '$'})</option>
+									</select>
+								</div>
 							</div>
-						</div>
-					</CardContent>
-				</Card>
+						</CardContent>
+					</Card>
 
-				<!-- Save Changes Button -->
-				<div class="flex justify-end mt-8">
-					<Button size="lg" class="min-w-[200px]">
-						<Save class="mr-2 h-5 w-5" />
-						Save All Changes
-					</Button>
+					<!-- Display Preferences -->
+					<Card class="border shadow-sm">
+						<CardHeader>
+							<CardTitle class="text-xl">Display Preferences</CardTitle>
+							<CardDescription>Customize how information is displayed</CardDescription>
+						</CardHeader>
+						<CardContent class="space-y-4">
+							<div class="grid gap-4">
+								<div class="grid gap-2">
+									<Label for="number-format">Number Format</Label>
+									<select
+										id="number-format"
+										name="number-format"
+										bind:value={numberFormat}
+										class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+									>
+										{#each data.numberFormats as format}
+											<option value={format.value}>{format.label}</option>
+										{/each}
+									</select>
+								</div>
+								<div class="flex items-center justify-between">
+									<div class="space-y-0.5">
+										<Label for="compact-numbers">Compact Numbers</Label>
+										<p class="text-sm text-muted-foreground">Show large numbers as 1.5M instead of 1,500,000</p>
+									</div>
+									<Switch id="compact-numbers" name="compact-numbers" bind:checked={compactNumbers} />
+								</div>
+							</div>
+						</CardContent>
+					</Card>
+
+					<!-- Save Changes Button -->
+					<div class="flex justify-end mt-8">
+						<Button type="submit" size="lg" class="min-w-[200px]" disabled={isLoading}>
+							{#if isLoading}
+								<Loader2 class="mr-2 h-5 w-5 animate-spin" />
+								Saving...
+							{:else}
+								<Save class="mr-2 h-5 w-5" />
+								Save All Changes
+							{/if}
+						</Button>
+					</div>
+					
+					{#if form?.success}
+						<div class="mt-4 p-4 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200 rounded-lg">
+							Settings saved successfully!
+						</div>
+					{/if}
+					
+					{#if form?.error}
+						<div class="mt-4 p-4 bg-red-50 dark:bg-red-950 text-red-800 dark:text-red-200 rounded-lg">
+							{form.error}
+						</div>
+					{/if}
 				</div>
-			</div>
+			</form>
 		</TabsContent>
 	</Tabs>
 	</div>
@@ -488,11 +537,29 @@
 			<Dialog.Title>Add New Debt Type</Dialog.Title>
 			<Dialog.Description>Create a new debt type for tracking</Dialog.Description>
 		</Dialog.Header>
-		<form onsubmit={(e) => { e.preventDefault(); addDebtType(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/createDebtType"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						showAddDebtType = false;
+						newDebtType = { label: '', icon: '' };
+						await update();
+						// Refresh debt types from server
+						location.reload();
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="space-y-4"
+		>
 			<div class="space-y-2">
 				<Label for="debt-label">Label</Label>
 				<Input
 					id="debt-label"
+					name="label"
 					placeholder="e.g., Student Loan"
 					bind:value={newDebtType.label}
 					required
@@ -502,6 +569,7 @@
 				<Label for="debt-icon">Icon (Emoji)</Label>
 				<Input
 					id="debt-icon"
+					name="icon"
 					placeholder="e.g., 🎓"
 					bind:value={newDebtType.icon}
 					required
@@ -524,16 +592,32 @@
 			<Dialog.Title>Add New Asset Type</Dialog.Title>
 			<Dialog.Description>Create a new asset type for tracking</Dialog.Description>
 		</Dialog.Header>
-		<form onsubmit={(e) => { e.preventDefault(); addAssetType(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/createAssetType"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						showAddAssetType = false;
+						newAssetType = { label: '', icon: '' };
+						await update();
+						location.reload();
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="space-y-4">
 			<div class="space-y-2">
 				<Label for="asset-category">Category</Label>
 				<select
 					id="asset-category"
+					name="category"
 					bind:value={selectedAssetCategory}
 					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 				>
 					<option value="liquid">Liquid Assets</option>
-					<option value="nonLiquid">Non-Liquid Assets</option>
+					<option value="non_liquid">Non-Liquid Assets</option>
 					<option value="investment">Investments</option>
 				</select>
 			</div>
@@ -541,6 +625,7 @@
 				<Label for="asset-label">Label</Label>
 				<Input
 					id="asset-label"
+					name="label"
 					placeholder="e.g., Retirement Fund"
 					bind:value={newAssetType.label}
 					required
@@ -550,6 +635,7 @@
 				<Label for="asset-icon">Icon (Emoji)</Label>
 				<Input
 					id="asset-icon"
+					name="icon"
 					placeholder="e.g., 💰"
 					bind:value={newAssetType.icon}
 					required
@@ -572,11 +658,27 @@
 			<Dialog.Title>Add New Transaction Type</Dialog.Title>
 			<Dialog.Description>Create a new transaction type</Dialog.Description>
 		</Dialog.Header>
-		<form onsubmit={(e) => { e.preventDefault(); addTransactionType(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/createTransactionCategory"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						showAddTransactionType = false;
+						newTransactionType = { label: '' };
+						await update();
+						location.reload();
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="space-y-4">
 			<div class="space-y-2">
 				<Label for="trans-category">Category</Label>
 				<select
 					id="trans-category"
+					name="type"
 					bind:value={selectedTransactionCategory}
 					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 				>
@@ -589,6 +691,7 @@
 				<Label for="trans-label">Label</Label>
 				<Input
 					id="trans-label"
+					name="label"
 					placeholder="e.g., Subscription"
 					bind:value={newTransactionType.label}
 					required
