@@ -69,9 +69,38 @@ export const debtTypes = pgTable('debt_types', {
 	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
+// Asset types table
+export const assetTypes = pgTable('asset_types', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	category: text('category').notNull(), // 'liquid', 'non_liquid', 'investment'
+	label: text('label').notNull(),
+	icon: text('icon').notNull(),
+	isSystem: boolean('is_system').notNull().default(false),
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
+});
+
+// Transaction categories table
+export const transactionCategories = pgTable('transaction_categories', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	type: text('type').notNull(), // 'income', 'expense', 'transfer'
+	label: text('label').notNull(),
+	isSystem: boolean('is_system').notNull().default(false),
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
+});
+
 export type Session = typeof session.$inferSelect;
 export type User = typeof user.$inferSelect;
 export type PasswordResetToken = typeof passwordResetToken.$inferSelect;
 export type Currency = typeof currencies.$inferSelect;
 export type UserPreferences = typeof userPreferences.$inferSelect;
 export type DebtType = typeof debtTypes.$inferSelect;
+export type AssetType = typeof assetTypes.$inferSelect;
+export type TransactionCategory = typeof transactionCategories.$inferSelect;

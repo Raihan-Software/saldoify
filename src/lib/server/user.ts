@@ -5,6 +5,8 @@ import * as table from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { createDefaultPreferences } from './preferences';
 import { createDefaultDebtTypes } from './debt-types';
+import { createDefaultAssetTypes } from './asset-types';
+import { createDefaultTransactionCategories } from './transaction-categories';
 
 // Generate a user ID with 120 bits of entropy
 export function generateUserId(): string {
@@ -67,6 +69,12 @@ export async function createUser(input: CreateUserInput) {
 		
 		// Create default debt types for the new user
 		await createDefaultDebtTypes(newUser.id);
+		
+		// Create default asset types for the new user
+		await createDefaultAssetTypes(newUser.id);
+		
+		// Create default transaction categories for the new user
+		await createDefaultTransactionCategories(newUser.id);
 		
 		return {
 			id: newUser.id,

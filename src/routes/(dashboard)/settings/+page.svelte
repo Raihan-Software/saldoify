@@ -20,59 +20,10 @@
 	import { investmentAssetTypes } from '$lib/modules/assets/investment/investment-assets-data';
 	import { transactionCategories } from '$lib/modules/transactions/transactions-data';
 
-	// State for managing types - debt types now come from database
+	// State for managing types - all types now come from database
 	let debtTypes = $state(data.debtTypes || []);
-	
-	let assetTypes = $state({
-		liquid: [
-			...Object.entries(liquidAssetTypes).map(([key, value]) => ({ id: key, ...value })),
-			{ id: 'crypto-wallet', label: 'Crypto Wallet', icon: '🔐' },
-			{ id: 'e-wallet', label: 'E-Wallet', icon: '📱' },
-			{ id: 'foreign-currency', label: 'Foreign Currency', icon: '💱' }
-		],
-		nonLiquid: [
-			...Object.entries(nonLiquidAssetTypes).map(([key, value]) => ({ id: key, ...value })),
-			{ id: 'furniture', label: 'Furniture', icon: '🪑' },
-			{ id: 'appliances', label: 'Home Appliances', icon: '🏠' },
-			{ id: 'books', label: 'Book Collection', icon: '📚' },
-			{ id: 'art', label: 'Art & Paintings', icon: '🖼️' }
-		],
-		investment: [
-			...Object.entries(investmentAssetTypes).map(([key, value]) => ({ id: key, ...value })),
-			{ id: 'reit', label: 'REITs', icon: '🏘️' },
-			{ id: 'p2p-lending', label: 'P2P Lending', icon: '🤝' },
-			{ id: 'gold-account', label: 'Gold Account', icon: '🥇' },
-			{ id: 'forex', label: 'Forex', icon: '💱' }
-		]
-	});
-	
-	let transactionCats = $state({
-		income: [
-			...Object.entries(transactionCategories.income.types).map(([key, value]) => ({ id: key, label: value })),
-			{ id: 'bonus', label: 'Bonus' },
-			{ id: 'rental', label: 'Rental Income' },
-			{ id: 'business', label: 'Business Income' },
-			{ id: 'interest', label: 'Interest Income' },
-			{ id: 'cashback', label: 'Cashback & Rewards' }
-		],
-		expense: [
-			...Object.entries(transactionCategories.expense.types).map(([key, value]) => ({ id: key, label: value })),
-			{ id: 'rent', label: 'Rent' },
-			{ id: 'insurance', label: 'Insurance' },
-			{ id: 'subscription', label: 'Subscriptions' },
-			{ id: 'personal-care', label: 'Personal Care' },
-			{ id: 'pet', label: 'Pet Expenses' },
-			{ id: 'donation', label: 'Donations' },
-			{ id: 'tax', label: 'Taxes' },
-			{ id: 'household', label: 'Household Items' }
-		],
-		transfer: [
-			...Object.entries(transactionCategories.transfer.types).map(([key, value]) => ({ id: key, label: value })),
-			{ id: 'loan-payment', label: 'Loan Payment' },
-			{ id: 'family', label: 'Family Transfer' },
-			{ id: 'emergency-fund', label: 'Emergency Fund' }
-		]
-	});
+	let assetTypes = $state(data.assetTypes || { liquid: [], non_liquid: [], investment: [] });
+	let transactionCats = $state(data.transactionCategories || { income: [], expense: [], transfer: [] });
 
 	// Edit states
 	let editingDebt = $state<string | null>(null);
@@ -83,7 +34,7 @@
 	let showAddDebtType = $state(false);
 	let showAddAssetType = $state(false);
 	let showAddTransactionType = $state(false);
-	let selectedAssetCategory = $state<'liquid' | 'nonLiquid' | 'investment'>('liquid');
+	let selectedAssetCategory = $state<'liquid' | 'non_liquid' | 'investment'>('liquid');
 	let selectedTransactionCategory = $state<'income' | 'expense' | 'transfer'>('income');
 
 	// Form data for new items
@@ -138,45 +89,81 @@
 		}
 	}
 
-	function saveAssetType(category: string, id: string, newLabel: string) {
-		const index = assetTypes[category as keyof typeof assetTypes].findIndex(at => at.id === id);
-		if (index !== -1) {
-			assetTypes[category as keyof typeof assetTypes][index].label = newLabel;
-		}
-		editingAsset = null;
-	}
-
-	function deleteAssetType(category: string, id: string) {
-		assetTypes[category as keyof typeof assetTypes] = assetTypes[category as keyof typeof assetTypes].filter(at => at.id !== id);
-	}
-
-	function addAssetType() {
-		if (newAssetType.label && newAssetType.icon) {
-			const id = newAssetType.label.toLowerCase().replace(/\s+/g, '-');
-			assetTypes[selectedAssetCategory] = [...assetTypes[selectedAssetCategory], { id, label: newAssetType.label, icon: newAssetType.icon }];
-			newAssetType = { label: '', icon: '' };
-			showAddAssetType = false;
+	async function saveAssetType(category: string, id: string, newLabel: string) {
+		const formData = new FormData();
+		formData.append('id', id);
+		formData.append('label', newLabel);
+		
+		const response = await fetch('?/updateAssetType', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			const index = assetTypes[category as keyof typeof assetTypes].findIndex(at => at.id === id);
+			if (index !== -1) {
+				assetTypes[category as keyof typeof assetTypes][index].label = newLabel;
+			}
+			editingAsset = null;
 		}
 	}
 
-	function saveTransactionType(category: string, id: string, newLabel: string) {
-		const index = transactionCats[category as keyof typeof transactionCats].findIndex(tt => tt.id === id);
-		if (index !== -1) {
-			transactionCats[category as keyof typeof transactionCats][index].label = newLabel;
+	async function deleteAssetType(category: string, id: string) {
+		const assetType = assetTypes[category as keyof typeof assetTypes].find(at => at.id === id);
+		if (assetType?.isSystem) {
+			alert('Cannot delete system asset types');
+			return;
 		}
-		editingTransaction = null;
+		
+		const formData = new FormData();
+		formData.append('id', id);
+		
+		const response = await fetch('?/deleteAssetType', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			assetTypes[category as keyof typeof assetTypes] = assetTypes[category as keyof typeof assetTypes].filter(at => at.id !== id);
+		}
 	}
 
-	function deleteTransactionType(category: string, id: string) {
-		transactionCats[category as keyof typeof transactionCats] = transactionCats[category as keyof typeof transactionCats].filter(tt => tt.id !== id);
+	async function saveTransactionType(category: string, id: string, newLabel: string) {
+		const formData = new FormData();
+		formData.append('id', id);
+		formData.append('label', newLabel);
+		
+		const response = await fetch('?/updateTransactionCategory', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			const index = transactionCats[category as keyof typeof transactionCats].findIndex(tt => tt.id === id);
+			if (index !== -1) {
+				transactionCats[category as keyof typeof transactionCats][index].label = newLabel;
+			}
+			editingTransaction = null;
+		}
 	}
 
-	function addTransactionType() {
-		if (newTransactionType.label) {
-			const id = newTransactionType.label.toLowerCase().replace(/\s+/g, '-');
-			transactionCats[selectedTransactionCategory] = [...transactionCats[selectedTransactionCategory], { id, label: newTransactionType.label }];
-			newTransactionType = { label: '' };
-			showAddTransactionType = false;
+	async function deleteTransactionType(category: string, id: string) {
+		const transactionType = transactionCats[category as keyof typeof transactionCats].find(tt => tt.id === id);
+		if (transactionType?.isSystem) {
+			alert('Cannot delete system transaction categories');
+			return;
+		}
+		
+		const formData = new FormData();
+		formData.append('id', id);
+		
+		const response = await fetch('?/deleteTransactionCategory', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			transactionCats[category as keyof typeof transactionCats] = transactionCats[category as keyof typeof transactionCats].filter(tt => tt.id !== id);
 		}
 	}
 </script>
@@ -295,7 +282,7 @@
 					<Tabs value="liquid" class="w-full">
 						<TabsList class="grid grid-cols-3 w-full mb-4">
 							<TabsTrigger value="liquid">Liquid Assets</TabsTrigger>
-							<TabsTrigger value="nonLiquid">Non-Liquid Assets</TabsTrigger>
+							<TabsTrigger value="non_liquid">Non-Liquid Assets</TabsTrigger>
 							<TabsTrigger value="investment">Investments</TabsTrigger>
 						</TabsList>
 						
@@ -321,6 +308,9 @@
 												/>
 											{:else}
 												<span class="font-medium">{assetType.label}</span>
+												{#if assetType.isSystem}
+													<Badge variant="secondary" class="ml-2">System</Badge>
+												{/if}
 											{/if}
 										</div>
 										<div class="flex items-center gap-2">
@@ -329,12 +319,14 @@
 													<X class="h-4 w-4" />
 												</Button>
 											{:else}
-												<Button size="icon" variant="ghost" onclick={() => editingAsset = { type: category, id: assetType.id }}>
-													<Edit2 class="h-4 w-4" />
-												</Button>
-												<Button size="icon" variant="ghost" onclick={() => deleteAssetType(category, assetType.id)}>
-													<Trash2 class="h-4 w-4" />
-												</Button>
+												{#if !assetType.isSystem}
+													<Button size="icon" variant="ghost" onclick={() => editingAsset = { type: category, id: assetType.id }}>
+														<Edit2 class="h-4 w-4" />
+													</Button>
+													<Button size="icon" variant="ghost" onclick={() => deleteAssetType(category, assetType.id)}>
+														<Trash2 class="h-4 w-4" />
+													</Button>
+												{/if}
 											{/if}
 										</div>
 									</div>
@@ -393,6 +385,9 @@
 												/>
 											{:else}
 												<span class="font-medium">{transType.label}</span>
+												{#if transType.isSystem}
+													<Badge variant="secondary" class="ml-2">System</Badge>
+												{/if}
 											{/if}
 										</div>
 										<div class="flex items-center gap-2">
@@ -401,12 +396,14 @@
 													<X class="h-4 w-4" />
 												</Button>
 											{:else}
-												<Button size="icon" variant="ghost" onclick={() => editingTransaction = { category, id: transType.id }}>
-													<Edit2 class="h-4 w-4" />
-												</Button>
-												<Button size="icon" variant="ghost" onclick={() => deleteTransactionType(category, transType.id)}>
-													<Trash2 class="h-4 w-4" />
-												</Button>
+												{#if !transType.isSystem}
+													<Button size="icon" variant="ghost" onclick={() => editingTransaction = { category, id: transType.id }}>
+														<Edit2 class="h-4 w-4" />
+													</Button>
+													<Button size="icon" variant="ghost" onclick={() => deleteTransactionType(category, transType.id)}>
+														<Trash2 class="h-4 w-4" />
+													</Button>
+												{/if}
 											{/if}
 										</div>
 									</div>
@@ -595,16 +592,32 @@
 			<Dialog.Title>Add New Asset Type</Dialog.Title>
 			<Dialog.Description>Create a new asset type for tracking</Dialog.Description>
 		</Dialog.Header>
-		<form onsubmit={(e) => { e.preventDefault(); addAssetType(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/createAssetType"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						showAddAssetType = false;
+						newAssetType = { label: '', icon: '' };
+						await update();
+						location.reload();
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="space-y-4">
 			<div class="space-y-2">
 				<Label for="asset-category">Category</Label>
 				<select
 					id="asset-category"
+					name="category"
 					bind:value={selectedAssetCategory}
 					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 				>
 					<option value="liquid">Liquid Assets</option>
-					<option value="nonLiquid">Non-Liquid Assets</option>
+					<option value="non_liquid">Non-Liquid Assets</option>
 					<option value="investment">Investments</option>
 				</select>
 			</div>
@@ -612,6 +625,7 @@
 				<Label for="asset-label">Label</Label>
 				<Input
 					id="asset-label"
+					name="label"
 					placeholder="e.g., Retirement Fund"
 					bind:value={newAssetType.label}
 					required
@@ -621,6 +635,7 @@
 				<Label for="asset-icon">Icon (Emoji)</Label>
 				<Input
 					id="asset-icon"
+					name="icon"
 					placeholder="e.g., 💰"
 					bind:value={newAssetType.icon}
 					required
@@ -643,11 +658,27 @@
 			<Dialog.Title>Add New Transaction Type</Dialog.Title>
 			<Dialog.Description>Create a new transaction type</Dialog.Description>
 		</Dialog.Header>
-		<form onsubmit={(e) => { e.preventDefault(); addTransactionType(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/createTransactionCategory"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						showAddTransactionType = false;
+						newTransactionType = { label: '' };
+						await update();
+						location.reload();
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="space-y-4">
 			<div class="space-y-2">
 				<Label for="trans-category">Category</Label>
 				<select
 					id="trans-category"
+					name="type"
 					bind:value={selectedTransactionCategory}
 					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 				>
@@ -660,6 +691,7 @@
 				<Label for="trans-label">Label</Label>
 				<Input
 					id="trans-label"
+					name="label"
 					placeholder="e.g., Subscription"
 					bind:value={newTransactionType.label}
 					required
