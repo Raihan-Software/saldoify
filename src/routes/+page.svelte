@@ -2,7 +2,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 </script>
 
-<div class="p-8 max-w-7xl">
+<div class="p-8">
 	<div class="mb-8">
 		<h1 class="text-3xl font-bold mb-2">Dashboard</h1>
 		<p class="text-muted-foreground">Welcome to your personal finance dashboard</p>
