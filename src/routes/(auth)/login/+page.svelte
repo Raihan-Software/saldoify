@@ -1,50 +1,17 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Mail, Lock, Loader2 } from '@lucide/svelte';
+	import type { ActionData } from './$types';
 	
-	let email = $state('');
-	let password = $state('');
-	let rememberMe = $state(false);
+	let { form }: { form: ActionData } = $props();
+	
 	let isLoading = $state(false);
-	let errors = $state<{ email?: string; password?: string; general?: string }>({});
-	
-	function validateForm() {
-		const newErrors: typeof errors = {};
-		
-		if (!email) {
-			newErrors.email = 'Email is required';
-		} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-			newErrors.email = 'Please enter a valid email';
-		}
-		
-		if (!password) {
-			newErrors.password = 'Password is required';
-		} else if (password.length < 6) {
-			newErrors.password = 'Password must be at least 6 characters';
-		}
-		
-		errors = newErrors;
-		return Object.keys(newErrors).length === 0;
-	}
-	
-	async function handleSubmit(e: Event) {
-		e.preventDefault();
-		
-		if (!validateForm()) return;
-		
-		isLoading = true;
-		
-		// Simulate API call
-		setTimeout(() => {
-			isLoading = false;
-			// For demo, just redirect to dashboard
-			window.location.href = '/';
-		}, 1500);
-	}
+	let rememberMe = $state(false);
 </script>
 
 <Card class="shadow-xl border-0">
@@ -55,22 +22,34 @@
 		</CardDescription>
 	</CardHeader>
 	<CardContent>
-		<form onsubmit={handleSubmit} class="space-y-4">
+		<form 
+			method="POST" 
+			class="space-y-4"
+			use:enhance={() => {
+				isLoading = true;
+				return async ({ update }) => {
+					await update();
+					isLoading = false;
+				};
+			}}
+		>
 			<div class="space-y-2">
 				<Label for="email">Email</Label>
 				<div class="relative">
 					<Mail class="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
 					<Input
 						id="email"
+						name="email"
 						type="email"
 						placeholder="john@example.com"
-						bind:value={email}
+						value={form?.email || ''}
 						class="pl-9"
 						disabled={isLoading}
+						required
 					/>
 				</div>
-				{#if errors.email}
-					<p class="text-sm text-red-500">{errors.email}</p>
+				{#if form?.errors?.email}
+					<p class="text-sm text-red-500">{form.errors.email}</p>
 				{/if}
 			</div>
 			
@@ -85,28 +64,29 @@
 					<Lock class="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
 					<Input
 						id="password"
+						name="password"
 						type="password"
 						placeholder="••••••••"
-						bind:value={password}
 						class="pl-9"
 						disabled={isLoading}
+						required
 					/>
 				</div>
-				{#if errors.password}
-					<p class="text-sm text-red-500">{errors.password}</p>
+				{#if form?.errors?.password}
+					<p class="text-sm text-red-500">{form.errors.password}</p>
 				{/if}
 			</div>
 			
 			<div class="flex items-center space-x-2">
-				<Checkbox id="remember" bind:checked={rememberMe} disabled={isLoading} />
+				<Checkbox id="remember" name="remember" bind:checked={rememberMe} disabled={isLoading} />
 				<Label for="remember" class="text-sm font-normal cursor-pointer">
 					Remember me for 30 days
 				</Label>
 			</div>
 			
-			{#if errors.general}
+			{#if form?.errors?.general}
 				<div class="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950 rounded-md">
-					{errors.general}
+					{form.errors.general}
 				</div>
 			{/if}
 			

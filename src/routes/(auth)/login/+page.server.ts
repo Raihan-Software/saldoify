@@ -1,60 +1,76 @@
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
+import { verify } from '@node-rs/argon2';
+import { db } from '$lib/server/db';
+import * as table from '$lib/server/db/schema';
+import * as auth from '$lib/server/auth';
 
 const loginSchema = z.object({
 	email: z.string().email('Invalid email address'),
-	password: z.string().min(6, 'Password must be at least 6 characters'),
-	remember: z.boolean().optional()
+	password: z.string().min(1, 'Password is required')
 });
+
+export const load: PageServerLoad = async ({ locals }) => {
+	// If already logged in, redirect to dashboard
+	if (locals.user) {
+		throw redirect(303, '/');
+	}
+	return {};
+};
 
 export const actions = {
 	default: async ({ request, cookies }) => {
 		const formData = await request.formData();
-		const data = {
-			email: formData.get('email'),
-			password: formData.get('password'),
-			remember: formData.get('remember') === 'on'
-		};
+		const email = formData.get('email');
+		const password = formData.get('password');
 
-		try {
-			const validated = loginSchema.parse(data);
-			
-			// TODO: Implement actual authentication logic here
-			// For demo, we'll just check if email/password match demo credentials
-			if (validated.email === 'demo@saldoify.com' && validated.password === 'password123') {
-				// Set a demo session cookie
-				cookies.set('session', 'demo-session-token', {
-					path: '/',
-					httpOnly: true,
-					secure: process.env.NODE_ENV === 'production',
-					sameSite: 'lax',
-					maxAge: validated.remember ? 60 * 60 * 24 * 30 : 0 // 30 days if remember me
-				});
-				
-				throw redirect(303, '/');
-			}
-			
+		// Validate input
+		const result = loginSchema.safeParse({ email, password });
+		if (!result.success) {
+			const errors = result.error.flatten().fieldErrors;
 			return fail(400, {
-				email: validated.email,
-				error: 'Invalid email or password'
+				email: email?.toString() || '',
+				errors: {
+					email: errors.email?.[0],
+					password: errors.password?.[0]
+				}
 			});
-		} catch (error) {
-			if (error instanceof z.ZodError) {
-				const errors: Record<string, string> = {};
-				error.errors.forEach((err) => {
-					if (err.path[0]) {
-						errors[err.path[0].toString()] = err.message;
-					}
-				});
-				
-				return fail(400, {
-					email: data.email as string,
-					errors
-				});
-			}
-			
-			throw error;
 		}
+
+		// Find user by email
+		const [user] = await db
+			.select()
+			.from(table.user)
+			.where(eq(table.user.email, result.data.email));
+
+		if (!user) {
+			return fail(400, {
+				email: result.data.email,
+				errors: {
+					general: 'Invalid email or password'
+				}
+			});
+		}
+
+		// Verify password
+		const isValidPassword = await verify(user.passwordHash, result.data.password);
+		if (!isValidPassword) {
+			return fail(400, {
+				email: result.data.email,
+				errors: {
+					general: 'Invalid email or password'
+				}
+			});
+		}
+
+		// Create session
+		const sessionToken = auth.generateSessionToken();
+		const session = await auth.createSession(sessionToken, user.id);
+		auth.setSessionTokenCookie({ cookies } as any, sessionToken, session.expiresAt);
+
+		// Redirect to dashboard
+		throw redirect(303, '/');
 	}
 } satisfies Actions;
