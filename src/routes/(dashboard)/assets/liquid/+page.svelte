@@ -1,100 +1,69 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Plus, Edit, Trash2, TrendingUp, TrendingDown, Wallet } from '@lucide/svelte';
+	import { Plus, Edit, Trash2, TrendingUp, TrendingDown, Wallet, DollarSign, Hash, Building2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import PageHeader from '$lib/components/page-header.svelte';
-	import { 
-		mockLiquidAssets, 
-		calculateTotalLiquidAssets, 
-		liquidAssetTypes,
-		type LiquidAsset 
-	} from '$lib/modules/assets/liquid/liquid-assets-data';
-
-	let assets = $state(mockLiquidAssets);
-	let totalBalance = $derived(calculateTotalLiquidAssets(assets));
+	import type { PageData, ActionData } from './$types';
+	
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+	
+	// Modal states
 	let showAddModal = $state(false);
+	let showEditModal = $state(false);
+	let editingAsset = $state<any>(null);
 	
 	// Form state
 	let formData = $state({
+		assetTypeId: '',
 		name: '',
-		type: 'savings' as LiquidAsset['type'],
-		institution: '',
+		description: '',
+		currentValue: '',
 		accountNumber: '',
-		balance: '',
+		bankName: '',
 		notes: ''
 	});
 	
-	// Calculate month-over-month change (mock data)
-	const lastMonthTotal = 115000000; // Mock previous month total
-	const monthlyChange = $derived(totalBalance - lastMonthTotal);
-	const monthlyChangePercent = $derived(((monthlyChange / lastMonthTotal) * 100).toFixed(1));
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('id-ID', {
+	// Format currency for display
+	function displayCurrency(value: string | number) {
+		const amount = typeof value === 'string' ? parseFloat(value) : value;
+		const formatter = new Intl.NumberFormat('en-US', {
 			style: 'currency',
-			currency: 'IDR',
+			currency: data.preferences?.currencyCode || 'USD',
 			minimumFractionDigits: 0,
-			maximumFractionDigits: 0
-		}).format(amount);
-	}
-
-	function formatDate(date: Date): string {
-		return new Intl.DateTimeFormat('id-ID', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		}).format(date);
-	}
-
-	function getTypeVariant(type: string): "default" | "secondary" | "outline" {
-		switch (type) {
-			case 'cash': return 'default';
-			case 'savings': return 'secondary';
-			case 'checking': return 'outline';
-			default: return 'default';
+			maximumFractionDigits: 2
+		});
+		
+		if (data.preferences?.currencyDisplay === 'code') {
+			return formatter.format(amount).replace(/[A-Z]{3}/, data.preferences.currencyCode);
 		}
+		
+		return formatter.format(amount);
 	}
 	
-	function handleAddAsset() {
-		if (!formData.name || !formData.balance) return;
-		
-		const newAsset: LiquidAsset = {
-			id: Date.now().toString(),
-			name: formData.name,
-			type: formData.type,
-			institution: formData.institution || undefined,
-			accountNumber: formData.accountNumber || undefined,
-			balance: parseFloat(formData.balance),
-			currency: 'IDR',
-			lastUpdated: new Date(),
-			notes: formData.notes || undefined
-		};
-		
-		assets = [...assets, newAsset];
-		
-		// Reset form
+	// Edit asset
+	function startEdit(asset: any) {
+		editingAsset = asset;
+		showEditModal = true;
+	}
+	
+	// Reset form
+	function resetForm() {
 		formData = {
+			assetTypeId: '',
 			name: '',
-			type: 'savings',
-			institution: '',
+			description: '',
+			currentValue: '',
 			accountNumber: '',
-			balance: '',
+			bankName: '',
 			notes: ''
 		};
-		
-		showAddModal = false;
-	}
-	
-	function formatNumberInput(value: string): string {
-		// Remove all non-digit characters
-		const digits = value.replace(/\D/g, '');
-		// Format with thousand separators
-		return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 	}
 </script>
 
@@ -103,187 +72,263 @@
 	<!-- Header -->
 	<PageHeader 
 		title="Liquid Assets"
-		description="Manage your cash and bank accounts"
-		actionLabel="Add Asset"
-		actionIcon={Plus}
+		description="Manage your cash and easily accessible assets"
+		actionLabel="Add Liquid Asset"
 		onAction={() => showAddModal = true}
 	/>
 
 	<!-- Summary Cards -->
-	<div class="grid gap-4 md:grid-cols-2">
-		<!-- Total Balance Card -->
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Total Liquid Assets</CardTitle>
-				<Wallet class="h-4 w-4 text-muted-foreground" />
+	<div class="grid gap-4 md:grid-cols-3">
+		<Card class="border shadow-sm">
+			<CardHeader class="pb-2">
+				<div class="flex items-center justify-between">
+					<CardDescription>Total Value</CardDescription>
+					<DollarSign class="h-4 w-4 text-muted-foreground" />
+				</div>
 			</CardHeader>
 			<CardContent>
-				<div class="text-2xl font-bold">{formatCurrency(totalBalance)}</div>
-				<p class="text-xs text-muted-foreground mt-1">
-					Across {assets.length} accounts
+				<p class="text-2xl font-bold">{displayCurrency(data.summary.totalValue.toString())}</p>
+			</CardContent>
+		</Card>
+		
+		<Card class="border shadow-sm">
+			<CardHeader class="pb-2">
+				<div class="flex items-center justify-between">
+					<CardDescription>Number of Assets</CardDescription>
+					<Wallet class="h-4 w-4 text-muted-foreground" />
+				</div>
+			</CardHeader>
+			<CardContent>
+				<p class="text-2xl font-bold">{data.summary.count}</p>
+			</CardContent>
+		</Card>
+		
+		<Card class="border shadow-sm">
+			<CardHeader class="pb-2">
+				<div class="flex items-center justify-between">
+					<CardDescription>Growth</CardDescription>
+					{#if data.summary.growth >= 0}
+						<TrendingUp class="h-4 w-4 text-green-600" />
+					{:else}
+						<TrendingDown class="h-4 w-4 text-red-600" />
+					{/if}
+				</div>
+			</CardHeader>
+			<CardContent>
+				<p class="text-2xl font-bold {data.summary.growth >= 0 ? 'text-green-600' : 'text-red-600'}">
+					{data.summary.growth.toFixed(2)}%
 				</p>
 			</CardContent>
 		</Card>
-
-		<!-- Monthly Change Card -->
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Monthly Change</CardTitle>
-				{#if monthlyChange >= 0}
-					<TrendingUp class="h-4 w-4 text-green-600" />
-				{:else}
-					<TrendingDown class="h-4 w-4 text-red-600" />
-				{/if}
-			</CardHeader>
-			<CardContent>
-				<div class="text-2xl font-bold">{formatCurrency(Math.abs(monthlyChange))}</div>
-				<p class="text-xs {monthlyChange >= 0 ? 'text-green-600' : 'text-red-600'} mt-1">
-					{monthlyChange >= 0 ? '+' : ''}{monthlyChangePercent}% from last month
-				</p>
-			</CardContent>
-		</Card>
-
 	</div>
 
 	<!-- Assets Table -->
-	<Card class="mt-4">
+	<Card class="border shadow-sm">
 		<CardHeader>
-			<CardTitle>All Liquid Assets</CardTitle>
-			<CardDescription>
-				Click on any asset to view details or edit
-			</CardDescription>
+			<CardTitle>Your Liquid Assets</CardTitle>
+			<CardDescription>All your cash and easily accessible assets</CardDescription>
 		</CardHeader>
 		<CardContent>
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>Name</TableHead>
-						<TableHead>Type</TableHead>
-						<TableHead>Institution</TableHead>
-						<TableHead>Account</TableHead>
-						<TableHead class="text-right">Balance</TableHead>
-						<TableHead>Last Updated</TableHead>
-						<TableHead class="text-right">Actions</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{#each assets as asset}
+			{#if data.assets.length === 0}
+				<div class="text-center py-12">
+					<Wallet class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+					<h3 class="text-lg font-semibold mb-2">No liquid assets yet</h3>
+					<p class="text-muted-foreground mb-4">Add your first liquid asset to get started</p>
+					<Button onclick={() => showAddModal = true}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add Liquid Asset
+					</Button>
+				</div>
+			{:else}
+				<Table>
+					<TableHeader>
 						<TableRow>
-							<TableCell class="font-medium">
-								{asset.name}
-								{#if asset.notes}
-									<p class="text-xs text-muted-foreground">{asset.notes}</p>
-								{/if}
-							</TableCell>
-							<TableCell>
-								<Badge variant={getTypeVariant(asset.type)}>
-									{liquidAssetTypes[asset.type].icon} {liquidAssetTypes[asset.type].label}
-								</Badge>
-							</TableCell>
-							<TableCell>{asset.institution || '-'}</TableCell>
-							<TableCell class="font-mono text-sm">{asset.accountNumber || '-'}</TableCell>
-							<TableCell class="text-right font-medium">
-								{formatCurrency(asset.balance)}
-							</TableCell>
-							<TableCell>{formatDate(asset.lastUpdated)}</TableCell>
-							<TableCell class="text-right">
-								<div class="flex justify-end gap-2">
-									<Button variant="ghost" size="icon">
-										<Edit class="h-4 w-4" />
-									</Button>
-									<Button variant="ghost" size="icon">
-										<Trash2 class="h-4 w-4" />
-									</Button>
-								</div>
-							</TableCell>
+							<TableHead>Name</TableHead>
+							<TableHead>Type</TableHead>
+							<TableHead>Bank</TableHead>
+							<TableHead>Account</TableHead>
+							<TableHead class="text-right">Value</TableHead>
+							<TableHead class="text-right">Actions</TableHead>
 						</TableRow>
-					{/each}
-				</TableBody>
-			</Table>
+					</TableHeader>
+					<TableBody>
+						{#each data.assets as asset}
+							<TableRow>
+								<TableCell>
+									<div>
+										<p class="font-medium">{asset.name}</p>
+										{#if asset.description}
+											<p class="text-sm text-muted-foreground">{asset.description}</p>
+										{/if}
+									</div>
+								</TableCell>
+								<TableCell>
+									<div class="flex items-center gap-2">
+										<span class="text-xl">{asset.assetType?.icon}</span>
+										<span>{asset.assetType?.label}</span>
+									</div>
+								</TableCell>
+								<TableCell>
+									{#if asset.bankName}
+										<div class="flex items-center gap-1">
+											<Building2 class="h-3 w-3 text-muted-foreground" />
+											<span class="text-sm">{asset.bankName}</span>
+										</div>
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</TableCell>
+								<TableCell>
+									{#if asset.accountNumber}
+										<div class="flex items-center gap-1">
+											<Hash class="h-3 w-3 text-muted-foreground" />
+											<span class="text-sm font-mono">****{asset.accountNumber.slice(-4)}</span>
+										</div>
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</TableCell>
+								<TableCell class="text-right font-medium">
+									{displayCurrency(asset.currentValue)}
+								</TableCell>
+								<TableCell class="text-right">
+									<div class="flex items-center justify-end gap-2">
+										<Button size="icon" variant="ghost" onclick={() => startEdit(asset)}>
+											<Edit class="h-4 w-4" />
+										</Button>
+										<form 
+											method="POST" 
+											action="?/delete"
+											use:enhance={() => {
+												return async ({ update }) => {
+													if (confirm('Are you sure you want to delete this asset?')) {
+														await update();
+													}
+												};
+											}}
+											class="inline"
+										>
+											<input type="hidden" name="id" value={asset.id} />
+											<Button type="submit" size="icon" variant="ghost">
+												<Trash2 class="h-4 w-4" />
+											</Button>
+										</form>
+									</div>
+								</TableCell>
+							</TableRow>
+						{/each}
+					</TableBody>
+				</Table>
+			{/if}
 		</CardContent>
 	</Card>
 </div>
 
 <!-- Add Asset Modal -->
 <Dialog.Root bind:open={showAddModal}>
-	<Dialog.Content class="sm:max-w-[425px]">
+	<Dialog.Content class="max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Add New Liquid Asset</Dialog.Title>
-			<Dialog.Description>
-				Add a new cash or bank account to track your liquid assets.
-			</Dialog.Description>
+			<Dialog.Title>Add Liquid Asset</Dialog.Title>
+			<Dialog.Description>Add a new cash or easily accessible asset</Dialog.Description>
 		</Dialog.Header>
-		
-		<form onsubmit={(e) => { e.preventDefault(); handleAddAsset(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/create"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						showAddModal = false;
+						resetForm();
+						await update();
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="space-y-4"
+		>
 			<div class="space-y-2">
-				<Label for="name">Asset Name *</Label>
+				<Label for="assetTypeId">Asset Type</Label>
+				<select
+					id="assetTypeId"
+					name="assetTypeId"
+					bind:value={formData.assetTypeId}
+					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+					required
+				>
+					<option value="">Select asset type</option>
+					{#each data.liquidAssetTypes as type}
+						<option value={type.id}>
+							{type.icon} {type.label}
+						</option>
+					{/each}
+				</select>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="name">Name</Label>
 				<Input
 					id="name"
-					placeholder="e.g., BCA Savings"
+					name="name"
+					placeholder="e.g., Main Checking Account"
 					bind:value={formData.name}
 					required
 				/>
 			</div>
 			
 			<div class="space-y-2">
-				<Label for="type">Asset Type *</Label>
-				<select
-					id="type"
-					bind:value={formData.type}
-					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-				>
-					{#each Object.entries(liquidAssetTypes) as [value, { label, icon }]}
-						<option {value}>{icon} {label}</option>
-					{/each}
-				</select>
-			</div>
-			
-			<div class="space-y-2">
-				<Label for="institution">Institution</Label>
+				<Label for="description">Description (Optional)</Label>
 				<Input
-					id="institution"
-					placeholder="e.g., Bank Central Asia"
-					bind:value={formData.institution}
+					id="description"
+					name="description"
+					placeholder="e.g., Primary account for daily expenses"
+					bind:value={formData.description}
 				/>
 			</div>
 			
-			<div class="space-y-2">
-				<Label for="accountNumber">Account Number</Label>
-				<Input
-					id="accountNumber"
-					placeholder="e.g., ****1234"
-					bind:value={formData.accountNumber}
-				/>
-			</div>
-			
-			<div class="space-y-2">
-				<Label for="balance">Current Balance *</Label>
-				<div class="relative">
-					<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="bankName">Bank Name (Optional)</Label>
 					<Input
-						id="balance"
-						type="text"
-						placeholder="0"
-						class="pl-10"
-						bind:value={formData.balance}
-						oninput={(e) => {
-							const target = e.currentTarget;
-							const value = target.value;
-							const formatted = formatNumberInput(value);
-							formData.balance = value.replace(/\D/g, '');
-							target.value = formatted;
-						}}
-						required
+						id="bankName"
+						name="bankName"
+						placeholder="e.g., Chase Bank"
+						bind:value={formData.bankName}
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="accountNumber">Account Number (Optional)</Label>
+					<Input
+						id="accountNumber"
+						name="accountNumber"
+						placeholder="e.g., 1234567890"
+						bind:value={formData.accountNumber}
 					/>
 				</div>
 			</div>
 			
 			<div class="space-y-2">
-				<Label for="notes">Notes</Label>
+				<Label for="currentValue">Current Value</Label>
 				<Input
+					id="currentValue"
+					name="currentValue"
+					type="number"
+					step="0.01"
+					placeholder="0.00"
+					bind:value={formData.currentValue}
+					required
+				/>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="notes">Notes (Optional)</Label>
+				<Textarea
 					id="notes"
-					placeholder="Optional notes..."
+					name="notes"
+					placeholder="Any additional notes"
 					bind:value={formData.notes}
+					class="min-h-[80px]"
 				/>
 			</div>
 			
@@ -291,10 +336,114 @@
 				<Button type="button" variant="outline" onclick={() => showAddModal = false}>
 					Cancel
 				</Button>
-				<Button type="submit">
-					Add Asset
-				</Button>
+				<Button type="submit">Add Asset</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Edit Asset Modal -->
+<Dialog.Root bind:open={showEditModal}>
+	<Dialog.Content class="max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Edit Liquid Asset</Dialog.Title>
+			<Dialog.Description>Update your liquid asset information</Dialog.Description>
+		</Dialog.Header>
+		{#if editingAsset}
+			<form 
+				method="POST" 
+				action="?/update"
+				use:enhance={() => {
+					return async ({ result, update }) => {
+						if (result.type === 'success') {
+							showEditModal = false;
+							editingAsset = null;
+							await update();
+						} else {
+							await update();
+						}
+					};
+				}}
+				class="space-y-4"
+			>
+				<input type="hidden" name="id" value={editingAsset.id} />
+				
+				<div class="space-y-2">
+					<Label>Asset Type</Label>
+					<div class="flex items-center gap-2 p-3 bg-muted rounded-md">
+						<span class="text-xl">{editingAsset.assetType?.icon}</span>
+						<span>{editingAsset.assetType?.label}</span>
+					</div>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-name">Name</Label>
+					<Input
+						id="edit-name"
+						name="name"
+						value={editingAsset.name}
+						required
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-description">Description (Optional)</Label>
+					<Input
+						id="edit-description"
+						name="description"
+						value={editingAsset.description || ''}
+					/>
+				</div>
+				
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="edit-bankName">Bank Name (Optional)</Label>
+						<Input
+							id="edit-bankName"
+							name="bankName"
+							value={editingAsset.bankName || ''}
+						/>
+					</div>
+					
+					<div class="space-y-2">
+						<Label for="edit-accountNumber">Account Number (Optional)</Label>
+						<Input
+							id="edit-accountNumber"
+							name="accountNumber"
+							value={editingAsset.accountNumber || ''}
+						/>
+					</div>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-currentValue">Current Value</Label>
+					<Input
+						id="edit-currentValue"
+						name="currentValue"
+						type="number"
+						step="0.01"
+						value={editingAsset.currentValue}
+						required
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-notes">Notes (Optional)</Label>
+					<Textarea
+						id="edit-notes"
+						name="notes"
+						value={editingAsset.notes || ''}
+						class="min-h-[80px]"
+					/>
+				</div>
+				
+				<Dialog.Footer>
+					<Button type="button" variant="outline" onclick={() => { showEditModal = false; editingAsset = null; }}>
+						Cancel
+					</Button>
+					<Button type="submit">Update Asset</Button>
+				</Dialog.Footer>
+			</form>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>

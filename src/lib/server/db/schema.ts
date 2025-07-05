@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, serial, integer, text, timestamp, boolean, decimal } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
 	id: text('id').primaryKey(),
@@ -96,6 +96,43 @@ export const transactionCategories = pgTable('transaction_categories', {
 	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
+// Assets table
+export const assets = pgTable('assets', {
+	id: text('id').primaryKey(),
+	userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+	
+	// Asset categorization
+	type: text('type').notNull(), // 'liquid', 'non_liquid', 'investment'
+	assetTypeId: text('asset_type_id').notNull().references(() => assetTypes.id),
+	
+	// Basic info
+	name: text('name').notNull(),
+	description: text('description'),
+	
+	// Financial data
+	currentValue: decimal('current_value', { precision: 15, scale: 2 }).notNull(),
+	purchaseValue: decimal('purchase_value', { precision: 15, scale: 2 }),
+	purchaseDate: timestamp('purchase_date', { withTimezone: true, mode: 'date' }),
+	
+	// Additional fields based on type
+	// For liquid assets
+	accountNumber: text('account_number'),
+	bankName: text('bank_name'),
+	
+	// For non-liquid assets
+	location: text('location'),
+	quantity: integer('quantity').default(1),
+	
+	// For investments
+	ticker: text('ticker'),
+	shares: decimal('shares', { precision: 12, scale: 4 }),
+	
+	// Metadata
+	notes: text('notes'),
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
+});
+
 export type Session = typeof session.$inferSelect;
 export type User = typeof user.$inferSelect;
 export type PasswordResetToken = typeof passwordResetToken.$inferSelect;
@@ -104,3 +141,5 @@ export type UserPreferences = typeof userPreferences.$inferSelect;
 export type DebtType = typeof debtTypes.$inferSelect;
 export type AssetType = typeof assetTypes.$inferSelect;
 export type TransactionCategory = typeof transactionCategories.$inferSelect;
+export type Asset = typeof assets.$inferSelect;
+export type InsertAsset = typeof assets.$inferInsert;

@@ -35,7 +35,7 @@ The Minimum Viable Product (MVP) focuses on delivering core financial tracking f
 **Purpose**: Track all user assets in one place
 
 **Features**:
-- [ ] **Liquid Assets**
+- [x] **Liquid Assets**
   - Cash on hand
   - Savings accounts
   - Checking accounts
