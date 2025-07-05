@@ -1,144 +1,93 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Plus, Edit, Trash2, TrendingUp, TrendingDown, Package, ArrowUpRight, ArrowDownRight } from '@lucide/svelte';
+	import { Plus, Edit, Trash2, TrendingUp, TrendingDown, Home, Calendar, MapPin, Package } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Textarea } from '$lib/components/ui/textarea';
 	import PageHeader from '$lib/components/page-header.svelte';
-	import { 
-		mockNonLiquidAssets, 
-		calculateTotalNonLiquidAssets, 
-		nonLiquidAssetTypes,
-		type NonLiquidAsset 
-	} from '$lib/modules/assets/non-liquid/non-liquid-assets-data';
+	import type { PageData, ActionData } from './$types';
 
-	let assets = $state(mockNonLiquidAssets);
-	let showAddModal = $state(false);
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 	
-	// Calculate totals
-	let totals = $derived(calculateTotalNonLiquidAssets(assets));
+	// Modal states
+	let showAddModal = $state(false);
+	let showEditModal = $state(false);
+	let editingAsset = $state<any>(null);
 	
 	// Form state
 	let formData = $state({
+		assetTypeId: '',
 		name: '',
-		type: 'electronics' as NonLiquidAsset['type'],
-		category: '',
-		purchasePrice: '',
+		description: '',
 		currentValue: '',
+		purchaseValue: '',
 		purchaseDate: '',
 		location: '',
-		notes: '',
-		usefulLife: '',
-		depreciationRate: ''
+		quantity: '1',
+		notes: ''
 	});
 	
-	// Calculate depreciation when purchase price and useful life change
-	let annualDepreciation = $derived(() => {
-		if (formData.purchasePrice && formData.usefulLife) {
-			const price = parseFloat(formData.purchasePrice);
-			const years = parseFloat(formData.usefulLife);
-			return price / years;
-		}
-		return 0;
-	});
-	
-	let monthlyDepreciation = $derived(annualDepreciation() / 12);
-	
-	// Auto-calculate current value based on depreciation
-	function calculateDepreciatedValue() {
-		if (formData.purchasePrice && formData.purchaseDate && formData.usefulLife) {
-			const price = parseFloat(formData.purchasePrice);
-			const purchaseDate = new Date(formData.purchaseDate);
-			const now = new Date();
-			const monthsElapsed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + 
-				(now.getMonth() - purchaseDate.getMonth());
-			const depreciated = Math.max(0, price - (monthlyDepreciation * monthsElapsed));
-			formData.currentValue = depreciated.toString();
-		}
-	}
-	
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('id-ID', {
+	// Format currency for display
+	function displayCurrency(value: string | number) {
+		const amount = typeof value === 'string' ? parseFloat(value) : value;
+		const formatter = new Intl.NumberFormat('en-US', {
 			style: 'currency',
-			currency: 'IDR',
+			currency: data.preferences?.currencyCode || 'USD',
 			minimumFractionDigits: 0,
-			maximumFractionDigits: 0
-		}).format(amount);
+			maximumFractionDigits: 2
+		});
+		
+		if (data.preferences?.currencyDisplay === 'code') {
+			return formatter.format(amount).replace(/[A-Z]{3}/, data.preferences.currencyCode);
+		}
+		
+		return formatter.format(amount);
 	}
 
-	function formatDate(date: Date): string {
-		return new Intl.DateTimeFormat('id-ID', {
+	// Format date for display
+	function displayDate(dateString: string | Date | null) {
+		if (!dateString) return '-';
+		const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+		return new Intl.DateTimeFormat('en-US', {
 			year: 'numeric',
 			month: 'short',
 			day: 'numeric'
 		}).format(date);
 	}
-
-	function getTypeVariant(type: string): "default" | "secondary" | "outline" {
-		switch (type) {
-			case 'property': return 'default';
-			case 'vehicle': return 'secondary';
-			case 'electronics': return 'outline';
-			default: return 'secondary';
-		}
+	
+	// Edit asset
+	function startEdit(asset: any) {
+		editingAsset = asset;
+		showEditModal = true;
 	}
 	
-	
-	function handleAddAsset() {
-		if (!formData.name || !formData.purchasePrice || !formData.currentValue) return;
-		
-		const newAsset: NonLiquidAsset = {
-			id: Date.now().toString(),
-			name: formData.name,
-			type: formData.type,
-			category: formData.category || undefined,
-			purchasePrice: parseFloat(formData.purchasePrice),
-			currentValue: parseFloat(formData.currentValue),
-			purchaseDate: new Date(formData.purchaseDate),
-			currency: 'IDR',
-			location: formData.location || undefined,
-			notes: formData.notes || undefined,
-			depreciationRate: formData.usefulLife ? (100 / parseFloat(formData.usefulLife)) : undefined
-		};
-		
-		assets = [...assets, newAsset];
-		
-		// Reset form
+	// Reset form
+	function resetForm() {
 		formData = {
+			assetTypeId: '',
 			name: '',
-			type: 'electronics',
-			category: '',
-			purchasePrice: '',
+			description: '',
 			currentValue: '',
+			purchaseValue: '',
 			purchaseDate: '',
 			location: '',
-			notes: '',
-			usefulLife: '',
-			depreciationRate: ''
+			quantity: '1',
+			notes: ''
 		};
-		
-		showAddModal = false;
 	}
 	
-	function formatNumberInput(value: string): string {
-		const digits = value.replace(/\D/g, '');
-		return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-	}
-	
-	function getAppreciationBadge(asset: NonLiquidAsset) {
-		const appreciation = asset.currentValue - asset.purchasePrice;
-		const appreciationPercent = ((appreciation / asset.purchasePrice) * 100).toFixed(1);
-		
-		if (appreciation > 0) {
-			return { text: `+${appreciationPercent}%`, class: 'text-green-600 bg-green-50' };
-		} else if (appreciation < 0) {
-			return { text: `${appreciationPercent}%`, class: 'text-red-600 bg-red-50' };
-		}
-		return { text: '0%', class: 'text-gray-600 bg-gray-50' };
+	// Calculate appreciation
+	function calculateAppreciation(currentValue: string, purchaseValue: string | null) {
+		if (!purchaseValue) return null;
+		const current = parseFloat(currentValue);
+		const purchase = parseFloat(purchaseValue);
+		if (purchase === 0) return null;
+		return ((current - purchase) / purchase) * 100;
 	}
 </script>
 
@@ -146,287 +95,451 @@
 	<!-- Header -->
 	<PageHeader 
 		title="Non-Liquid Assets"
-		description="Manage your properties, vehicles, and valuables"
-		actionLabel="Add Asset"
-		actionIcon={Plus}
+		description="Manage your properties, vehicles, and other tangible assets"
+		actionLabel="Add Non-Liquid Asset"
 		onAction={() => showAddModal = true}
 	/>
 
 	<!-- Summary Cards -->
-	<div class="grid gap-4 md:grid-cols-2">
-		<!-- Total Current Value Card -->
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Total Current Value</CardTitle>
-				<Package class="h-4 w-4 text-muted-foreground" />
+	<div class="grid gap-4 md:grid-cols-3">
+		<Card class="border shadow-sm">
+			<CardHeader class="pb-2">
+				<div class="flex items-center justify-between">
+					<CardDescription>Total Value</CardDescription>
+					<Home class="h-4 w-4 text-muted-foreground" />
+				</div>
 			</CardHeader>
 			<CardContent>
-				<div class="text-2xl font-bold">{formatCurrency(totals.totalCurrentValue)}</div>
-				<p class="text-xs text-muted-foreground mt-1">
-					Across {assets.length} assets
-				</p>
+				<p class="text-2xl font-bold">{displayCurrency(data.summary.totalValue.toString())}</p>
 			</CardContent>
 		</Card>
-
-		<!-- Total Appreciation Card -->
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Total Appreciation</CardTitle>
-				{#if totals.totalAppreciation >= 0}
-					<ArrowUpRight class="h-4 w-4 text-green-600" />
-				{:else}
-					<ArrowDownRight class="h-4 w-4 text-red-600" />
-				{/if}
+		
+		<Card class="border shadow-sm">
+			<CardHeader class="pb-2">
+				<div class="flex items-center justify-between">
+					<CardDescription>Number of Assets</CardDescription>
+					<Package class="h-4 w-4 text-muted-foreground" />
+				</div>
 			</CardHeader>
 			<CardContent>
-				<div class="text-2xl font-bold">{formatCurrency(Math.abs(totals.totalAppreciation))}</div>
-				<p class="text-xs {totals.totalAppreciation >= 0 ? 'text-green-600' : 'text-red-600'} mt-1">
-					{totals.totalAppreciation >= 0 ? '+' : ''}{totals.appreciationPercent.toFixed(1)}% overall
+				<p class="text-2xl font-bold">{data.summary.count}</p>
+			</CardContent>
+		</Card>
+		
+		<Card class="border shadow-sm">
+			<CardHeader class="pb-2">
+				<div class="flex items-center justify-between">
+					<CardDescription>Average Appreciation</CardDescription>
+					{#if data.summary.growth >= 0}
+						<TrendingUp class="h-4 w-4 text-green-600" />
+					{:else}
+						<TrendingDown class="h-4 w-4 text-red-600" />
+					{/if}
+				</div>
+			</CardHeader>
+			<CardContent>
+				<p class="text-2xl font-bold {data.summary.growth >= 0 ? 'text-green-600' : 'text-red-600'}">
+					{data.summary.growth.toFixed(2)}%
 				</p>
 			</CardContent>
 		</Card>
 	</div>
 
 	<!-- Assets Table -->
-	<Card class="mt-4">
+	<Card class="border shadow-sm">
 		<CardHeader>
-			<CardTitle>All Non-Liquid Assets</CardTitle>
-			<CardDescription>
-				Track depreciation and appreciation of your valuable assets
-			</CardDescription>
+			<CardTitle>Your Non-Liquid Assets</CardTitle>
+			<CardDescription>Properties, vehicles, and other tangible assets</CardDescription>
 		</CardHeader>
 		<CardContent>
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>Name</TableHead>
-						<TableHead>Type</TableHead>
-						<TableHead>Category</TableHead>
-						<TableHead>Purchase Price</TableHead>
-						<TableHead>Current Value</TableHead>
-						<TableHead>Appreciation</TableHead>
-						<TableHead>Purchase Date</TableHead>
-						<TableHead class="text-right">Actions</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{#each assets as asset}
-						{@const appreciation = getAppreciationBadge(asset)}
+			{#if data.assets.length === 0}
+				<div class="text-center py-12">
+					<Home class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+					<h3 class="text-lg font-semibold mb-2">No non-liquid assets yet</h3>
+					<p class="text-muted-foreground mb-4">Add your first property or vehicle to get started</p>
+					<Button onclick={() => showAddModal = true}>
+						<Plus class="mr-2 h-4 w-4" />
+						Add Non-Liquid Asset
+					</Button>
+				</div>
+			{:else}
+				<Table>
+					<TableHeader>
 						<TableRow>
-							<TableCell class="font-medium">
-								{asset.name}
-								{#if asset.notes}
-									<p class="text-xs text-muted-foreground">{asset.notes}</p>
-								{/if}
-							</TableCell>
-							<TableCell>
-								<Badge variant={getTypeVariant(asset.type)}>
-									{nonLiquidAssetTypes[asset.type].icon} {nonLiquidAssetTypes[asset.type].label}
-								</Badge>
-							</TableCell>
-							<TableCell>{asset.category || '-'}</TableCell>
-							<TableCell>{formatCurrency(asset.purchasePrice)}</TableCell>
-							<TableCell class="font-medium">{formatCurrency(asset.currentValue)}</TableCell>
-							<TableCell>
-								<Badge class={appreciation.class} variant="secondary">
-									{appreciation.text}
-								</Badge>
-							</TableCell>
-							<TableCell>{formatDate(asset.purchaseDate)}</TableCell>
-							<TableCell class="text-right">
-								<div class="flex justify-end gap-2">
-									<Button variant="ghost" size="icon">
-										<Edit class="h-4 w-4" />
-									</Button>
-									<Button variant="ghost" size="icon">
-										<Trash2 class="h-4 w-4" />
-									</Button>
-								</div>
-							</TableCell>
+							<TableHead>Name</TableHead>
+							<TableHead>Type</TableHead>
+							<TableHead>Location</TableHead>
+							<TableHead>Purchase Date</TableHead>
+							<TableHead class="text-center">Qty</TableHead>
+							<TableHead class="text-right">Purchase Value</TableHead>
+							<TableHead class="text-right">Current Value</TableHead>
+							<TableHead class="text-center">Appreciation</TableHead>
+							<TableHead class="text-right">Actions</TableHead>
 						</TableRow>
-					{/each}
-				</TableBody>
-			</Table>
+					</TableHeader>
+					<TableBody>
+						{#each data.assets as asset}
+							{@const appreciation = calculateAppreciation(asset.currentValue, asset.purchaseValue)}
+							<TableRow>
+								<TableCell>
+									<div>
+										<p class="font-medium">{asset.name}</p>
+										{#if asset.description}
+											<p class="text-sm text-muted-foreground">{asset.description}</p>
+										{/if}
+									</div>
+								</TableCell>
+								<TableCell>
+									<div class="flex items-center gap-2">
+										<span class="text-xl">{asset.assetType?.icon}</span>
+										<span>{asset.assetType?.label}</span>
+									</div>
+								</TableCell>
+								<TableCell>
+									{#if asset.location}
+										<div class="flex items-center gap-1">
+											<MapPin class="h-3 w-3 text-muted-foreground" />
+											<span class="text-sm">{asset.location}</span>
+										</div>
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</TableCell>
+								<TableCell>
+									{#if asset.purchaseDate}
+										<div class="flex items-center gap-1">
+											<Calendar class="h-3 w-3 text-muted-foreground" />
+											<span class="text-sm">{displayDate(asset.purchaseDate)}</span>
+										</div>
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</TableCell>
+								<TableCell class="text-center">
+									{asset.quantity || 1}
+								</TableCell>
+								<TableCell class="text-right">
+									{#if asset.purchaseValue}
+										{displayCurrency(asset.purchaseValue)}
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</TableCell>
+								<TableCell class="text-right font-medium">
+									{displayCurrency(asset.currentValue)}
+								</TableCell>
+								<TableCell class="text-center">
+									{#if appreciation !== null}
+										<Badge variant={appreciation >= 0 ? 'default' : 'destructive'}>
+											{appreciation >= 0 ? '+' : ''}{appreciation.toFixed(1)}%
+										</Badge>
+									{:else}
+										<span class="text-muted-foreground">-</span>
+									{/if}
+								</TableCell>
+								<TableCell class="text-right">
+									<div class="flex items-center justify-end gap-2">
+										<Button size="icon" variant="ghost" onclick={() => startEdit(asset)}>
+											<Edit class="h-4 w-4" />
+										</Button>
+										<form 
+											method="POST" 
+											action="?/delete"
+											use:enhance={() => {
+												return async ({ update }) => {
+													if (confirm('Are you sure you want to delete this asset?')) {
+														await update();
+													}
+												};
+											}}
+											class="inline"
+										>
+											<input type="hidden" name="id" value={asset.id} />
+											<Button type="submit" size="icon" variant="ghost">
+												<Trash2 class="h-4 w-4" />
+											</Button>
+										</form>
+									</div>
+								</TableCell>
+							</TableRow>
+						{/each}
+					</TableBody>
+				</Table>
+			{/if}
 		</CardContent>
 	</Card>
 </div>
 
 <!-- Add Asset Modal -->
 <Dialog.Root bind:open={showAddModal}>
-	<Dialog.Content class="sm:max-w-[600px]">
+	<Dialog.Content class="max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>Add New Non-Liquid Asset</Dialog.Title>
-			<Dialog.Description>
-				Add a property, vehicle, or valuable item to track its value over time.
-			</Dialog.Description>
+			<Dialog.Title>Add Non-Liquid Asset</Dialog.Title>
+			<Dialog.Description>Add a property, vehicle, or other tangible asset</Dialog.Description>
 		</Dialog.Header>
-		
-		<form onsubmit={(e) => { e.preventDefault(); handleAddAsset(); }} class="space-y-6 max-h-[65vh] overflow-y-auto px-1">
-			<!-- Basic Information Section -->
-			<div class="space-y-4">
-				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Basic Information</h3>
-				<div class="space-y-4 pl-1">
-					<div class="space-y-2">
-						<Label for="name">Asset Name *</Label>
-						<Input
-							id="name"
-							placeholder="e.g., MacBook Pro M2"
-							bind:value={formData.name}
-							required
-						/>
-					</div>
-					
-					<div class="grid grid-cols-2 gap-4">
-						<div class="space-y-2">
-							<Label for="type">Asset Type *</Label>
-							<select
-								id="type"
-								bind:value={formData.type}
-								class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-							>
-								{#each Object.entries(nonLiquidAssetTypes) as [value, { label, icon }]}
-									<option {value}>{icon} {label}</option>
-								{/each}
-							</select>
-						</div>
-						
-						<div class="space-y-2">
-							<Label for="category">Category</Label>
-							<Input
-								id="category"
-								placeholder="e.g., Computer"
-								bind:value={formData.category}
-							/>
-						</div>
-					</div>
-					
-					<div class="space-y-2">
-						<Label for="location">Location</Label>
-						<Input
-							id="location"
-							placeholder="e.g., Jakarta, Home Office"
-							bind:value={formData.location}
-						/>
-					</div>
+		<form 
+			method="POST" 
+			action="?/create"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						showAddModal = false;
+						resetForm();
+						await update();
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="space-y-4"
+		>
+			<div class="space-y-2">
+				<Label for="assetTypeId">Asset Type</Label>
+				<select
+					id="assetTypeId"
+					name="assetTypeId"
+					bind:value={formData.assetTypeId}
+					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+					required
+				>
+					<option value="">Select asset type</option>
+					{#each data.nonLiquidAssetTypes as type}
+						<option value={type.id}>
+							{type.icon} {type.label}
+						</option>
+					{/each}
+				</select>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="name">Name</Label>
+				<Input
+					id="name"
+					name="name"
+					placeholder="e.g., Main Residence"
+					bind:value={formData.name}
+					required
+				/>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="description">Description (Optional)</Label>
+				<Input
+					id="description"
+					name="description"
+					placeholder="e.g., 3-bedroom house"
+					bind:value={formData.description}
+				/>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="location">Location (Optional)</Label>
+				<Input
+					id="location"
+					name="location"
+					placeholder="e.g., San Francisco, CA"
+					bind:value={formData.location}
+				/>
+			</div>
+			
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="purchaseDate">Purchase Date (Optional)</Label>
+					<Input
+						id="purchaseDate"
+						name="purchaseDate"
+						type="date"
+						bind:value={formData.purchaseDate}
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="quantity">Quantity</Label>
+					<Input
+						id="quantity"
+						name="quantity"
+						type="number"
+						min="1"
+						bind:value={formData.quantity}
+					/>
 				</div>
 			</div>
 			
-			<!-- Value & Depreciation Section -->
-			<div class="space-y-4">
-				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Value & Depreciation</h3>
-				<div class="space-y-4 pl-1">
-					<div class="grid grid-cols-2 gap-4">
-						<div class="space-y-2">
-							<Label for="purchasePrice">Purchase Price *</Label>
-							<div class="relative">
-								<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
-								<Input
-									id="purchasePrice"
-									type="text"
-									placeholder="0"
-									class="pl-10"
-									bind:value={formData.purchasePrice}
-									oninput={(e) => {
-										const target = e.currentTarget;
-										const value = target.value;
-										const formatted = formatNumberInput(value);
-										formData.purchasePrice = value.replace(/\D/g, '');
-										target.value = formatted;
-										calculateDepreciatedValue();
-									}}
-									required
-								/>
-							</div>
-						</div>
-						
-						<div class="space-y-2">
-							<Label for="purchaseDate">Purchase Date *</Label>
-							<Input
-								id="purchaseDate"
-								type="date"
-								bind:value={formData.purchaseDate}
-								onchange={calculateDepreciatedValue}
-								required
-							/>
-						</div>
-					</div>
-					
-					<div class="grid grid-cols-2 gap-4">
-						<div class="space-y-2">
-							<Label for="usefulLife">Masa Manfaat (Years)</Label>
-							<Input
-								id="usefulLife"
-								type="number"
-								placeholder="e.g., 5"
-								min="1"
-								bind:value={formData.usefulLife}
-								onchange={calculateDepreciatedValue}
-							/>
-							<p class="text-xs text-muted-foreground">Useful life for depreciation</p>
-						</div>
-						
-						<div class="space-y-2">
-							<Label>Annual Depreciation</Label>
-							<div class="h-10 px-3 py-2 text-sm bg-muted rounded-md flex items-center">
-								{annualDepreciation() > 0 ? formatCurrency(annualDepreciation()) : '-'}
-							</div>
-							<p class="text-xs text-muted-foreground">Straight-line method</p>
-						</div>
-					</div>
-					
-					<div class="space-y-2">
-						<Label for="currentValue">Current Value *</Label>
-						<div class="relative">
-							<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
-							<Input
-								id="currentValue"
-								type="text"
-								placeholder="0"
-								class="pl-10"
-								bind:value={formData.currentValue}
-								oninput={(e) => {
-									const target = e.currentTarget;
-									const value = target.value;
-									const formatted = formatNumberInput(value);
-									formData.currentValue = value.replace(/\D/g, '');
-									target.value = formatted;
-								}}
-								required
-							/>
-						</div>
-						{#if formData.usefulLife && formData.purchasePrice && formData.purchaseDate}
-							<p class="text-xs text-muted-foreground">
-								Auto-calculated based on depreciation. You can override if needed.
-							</p>
-						{/if}
-					</div>
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="purchaseValue">Purchase Value (Optional)</Label>
+					<Input
+						id="purchaseValue"
+						name="purchaseValue"
+						type="number"
+						step="0.01"
+						placeholder="0.00"
+						bind:value={formData.purchaseValue}
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="currentValue">Current Value</Label>
+					<Input
+						id="currentValue"
+						name="currentValue"
+						type="number"
+						step="0.01"
+						placeholder="0.00"
+						bind:value={formData.currentValue}
+						required
+					/>
 				</div>
 			</div>
 			
-			<!-- Additional Information Section -->
-			<div class="space-y-4">
-				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Additional Information</h3>
-				<div class="space-y-4 pl-1">
-					<div class="space-y-2">
-						<Label for="notes">Notes</Label>
-						<textarea
-							id="notes"
-							placeholder="Additional details about the asset..."
-							bind:value={formData.notes}
-							class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-						/>
-					</div>
-				</div>
+			<div class="space-y-2">
+				<Label for="notes">Notes (Optional)</Label>
+				<Textarea
+					id="notes"
+					name="notes"
+					placeholder="Any additional notes"
+					bind:value={formData.notes}
+					class="min-h-[80px]"
+				/>
 			</div>
 			
-			<Dialog.Footer class="sticky bottom-0 bg-background pt-4 border-t">
+			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => showAddModal = false}>
 					Cancel
 				</Button>
-				<Button type="submit">
-					Add Asset
-				</Button>
+				<Button type="submit">Add Asset</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Edit Asset Modal -->
+<Dialog.Root bind:open={showEditModal}>
+	<Dialog.Content class="max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Edit Non-Liquid Asset</Dialog.Title>
+			<Dialog.Description>Update your asset information</Dialog.Description>
+		</Dialog.Header>
+		{#if editingAsset}
+			<form 
+				method="POST" 
+				action="?/update"
+				use:enhance={() => {
+					return async ({ result, update }) => {
+						if (result.type === 'success') {
+							showEditModal = false;
+							editingAsset = null;
+							await update();
+						} else {
+							await update();
+						}
+					};
+				}}
+				class="space-y-4"
+			>
+				<input type="hidden" name="id" value={editingAsset.id} />
+				
+				<div class="space-y-2">
+					<Label>Asset Type</Label>
+					<div class="flex items-center gap-2 p-3 bg-muted rounded-md">
+						<span class="text-xl">{editingAsset.assetType?.icon}</span>
+						<span>{editingAsset.assetType?.label}</span>
+					</div>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-name">Name</Label>
+					<Input
+						id="edit-name"
+						name="name"
+						value={editingAsset.name}
+						required
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-description">Description (Optional)</Label>
+					<Input
+						id="edit-description"
+						name="description"
+						value={editingAsset.description || ''}
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-location">Location (Optional)</Label>
+					<Input
+						id="edit-location"
+						name="location"
+						value={editingAsset.location || ''}
+					/>
+				</div>
+				
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="edit-purchaseDate">Purchase Date (Optional)</Label>
+						<Input
+							id="edit-purchaseDate"
+							name="purchaseDate"
+							type="date"
+							value={editingAsset.purchaseDate ? new Date(editingAsset.purchaseDate).toISOString().split('T')[0] : ''}
+						/>
+					</div>
+					
+					<div class="space-y-2">
+						<Label for="edit-quantity">Quantity</Label>
+						<Input
+							id="edit-quantity"
+							name="quantity"
+							type="number"
+							min="1"
+							value={editingAsset.quantity || 1}
+						/>
+					</div>
+				</div>
+				
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="edit-purchaseValue">Purchase Value (Optional)</Label>
+						<Input
+							id="edit-purchaseValue"
+							name="purchaseValue"
+							type="number"
+							step="0.01"
+							value={editingAsset.purchaseValue || ''}
+						/>
+					</div>
+					
+					<div class="space-y-2">
+						<Label for="edit-currentValue">Current Value</Label>
+						<Input
+							id="edit-currentValue"
+							name="currentValue"
+							type="number"
+							step="0.01"
+							value={editingAsset.currentValue}
+							required
+						/>
+					</div>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-notes">Notes (Optional)</Label>
+					<Textarea
+						id="edit-notes"
+						name="notes"
+						value={editingAsset.notes || ''}
+						class="min-h-[80px]"
+					/>
+				</div>
+				
+				<Dialog.Footer>
+					<Button type="button" variant="outline" onclick={() => { showEditModal = false; editingAsset = null; }}>
+						Cancel
+					</Button>
+					<Button type="submit">Update Asset</Button>
+				</Dialog.Footer>
+			</form>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>
