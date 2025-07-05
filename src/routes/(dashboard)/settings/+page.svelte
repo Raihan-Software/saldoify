@@ -15,19 +15,13 @@
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	// Import existing types
-	import { liabilityTypes } from '$lib/modules/networth/networth-data';
 	import { liquidAssetTypes } from '$lib/modules/assets/liquid/liquid-assets-data';
 	import { nonLiquidAssetTypes } from '$lib/modules/assets/non-liquid/non-liquid-assets-data';
 	import { investmentAssetTypes } from '$lib/modules/assets/investment/investment-assets-data';
 	import { transactionCategories } from '$lib/modules/transactions/transactions-data';
 
-	// State for managing types with additional mock data
-	let debtTypes = $state([
-		...Object.entries(liabilityTypes).map(([key, value]) => ({ id: key, ...value })),
-		{ id: 'business-loan', label: 'Business Loan', icon: '🏢' },
-		{ id: 'education-loan', label: 'Education Loan', icon: '🎓' },
-		{ id: 'payday-loan', label: 'Payday Loan', icon: '📅' }
-	]);
+	// State for managing types - debt types now come from database
+	let debtTypes = $state(data.debtTypes || []);
 	
 	let assetTypes = $state({
 		liquid: [
@@ -105,24 +99,42 @@
 	let isLoading = $state(false);
 
 	// Helper functions
-	function saveDebtType(id: string, newLabel: string) {
-		const index = debtTypes.findIndex(dt => dt.id === id);
-		if (index !== -1) {
-			debtTypes[index].label = newLabel;
+	async function saveDebtType(id: string, newLabel: string) {
+		const formData = new FormData();
+		formData.append('id', id);
+		formData.append('label', newLabel);
+		
+		const response = await fetch('?/updateDebtType', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			const index = debtTypes.findIndex(dt => dt.id === id);
+			if (index !== -1) {
+				debtTypes[index].label = newLabel;
+			}
+			editingDebt = null;
 		}
-		editingDebt = null;
 	}
 
-	function deleteDebtType(id: string) {
-		debtTypes = debtTypes.filter(dt => dt.id !== id);
-	}
-
-	function addDebtType() {
-		if (newDebtType.label && newDebtType.icon) {
-			const id = newDebtType.label.toLowerCase().replace(/\s+/g, '-');
-			debtTypes = [...debtTypes, { id, label: newDebtType.label, icon: newDebtType.icon }];
-			newDebtType = { label: '', icon: '' };
-			showAddDebtType = false;
+	async function deleteDebtType(id: string) {
+		const debtType = debtTypes.find(dt => dt.id === id);
+		if (debtType?.isSystem) {
+			alert('Cannot delete system debt types');
+			return;
+		}
+		
+		const formData = new FormData();
+		formData.append('id', id);
+		
+		const response = await fetch('?/deleteDebtType', {
+			method: 'POST',
+			body: formData
+		});
+		
+		if (response.ok) {
+			debtTypes = debtTypes.filter(dt => dt.id !== id);
 		}
 	}
 
@@ -236,6 +248,9 @@
 										/>
 									{:else}
 										<span class="font-medium">{debtType.label}</span>
+										{#if debtType.isSystem}
+											<Badge variant="secondary" class="ml-2">System</Badge>
+										{/if}
 									{/if}
 								</div>
 								<div class="flex items-center gap-2">
@@ -244,12 +259,14 @@
 											<X class="h-4 w-4" />
 										</Button>
 									{:else}
-										<Button size="icon" variant="ghost" onclick={() => editingDebt = debtType.id}>
-											<Edit2 class="h-4 w-4" />
-										</Button>
-										<Button size="icon" variant="ghost" onclick={() => deleteDebtType(debtType.id)}>
-											<Trash2 class="h-4 w-4" />
-										</Button>
+										{#if !debtType.isSystem}
+											<Button size="icon" variant="ghost" onclick={() => editingDebt = debtType.id}>
+												<Edit2 class="h-4 w-4" />
+											</Button>
+											<Button size="icon" variant="ghost" onclick={() => deleteDebtType(debtType.id)}>
+												<Trash2 class="h-4 w-4" />
+											</Button>
+										{/if}
 									{/if}
 								</div>
 							</div>
@@ -405,6 +422,7 @@
 		<TabsContent value="general" class="mt-6">
 			<form 
 				method="POST"
+				action="?/updatePreferences"
 				use:enhance={() => {
 					isLoading = true;
 					return async ({ update }) => {
@@ -522,11 +540,29 @@
 			<Dialog.Title>Add New Debt Type</Dialog.Title>
 			<Dialog.Description>Create a new debt type for tracking</Dialog.Description>
 		</Dialog.Header>
-		<form onsubmit={(e) => { e.preventDefault(); addDebtType(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/createDebtType"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') {
+						showAddDebtType = false;
+						newDebtType = { label: '', icon: '' };
+						await update();
+						// Refresh debt types from server
+						location.reload();
+					} else {
+						await update();
+					}
+				};
+			}}
+			class="space-y-4"
+		>
 			<div class="space-y-2">
 				<Label for="debt-label">Label</Label>
 				<Input
 					id="debt-label"
+					name="label"
 					placeholder="e.g., Student Loan"
 					bind:value={newDebtType.label}
 					required
@@ -536,6 +572,7 @@
 				<Label for="debt-icon">Icon (Emoji)</Label>
 				<Input
 					id="debt-icon"
+					name="icon"
 					placeholder="e.g., 🎓"
 					bind:value={newDebtType.icon}
 					required

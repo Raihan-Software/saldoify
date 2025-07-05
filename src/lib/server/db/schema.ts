@@ -56,8 +56,22 @@ export const userPreferences = pgTable('user_preferences', {
 	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
+// Debt types table
+export const debtTypes = pgTable('debt_types', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	label: text('label').notNull(),
+	icon: text('icon').notNull(),
+	isSystem: boolean('is_system').notNull().default(false), // For default types
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
+});
+
 export type Session = typeof session.$inferSelect;
 export type User = typeof user.$inferSelect;
 export type PasswordResetToken = typeof passwordResetToken.$inferSelect;
 export type Currency = typeof currencies.$inferSelect;
 export type UserPreferences = typeof userPreferences.$inferSelect;
+export type DebtType = typeof debtTypes.$inferSelect;
