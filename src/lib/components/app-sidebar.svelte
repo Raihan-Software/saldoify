@@ -17,7 +17,7 @@
 	} from '$lib/components/ui/sidebar';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import { Button } from '$lib/components/ui/button';
-	import { Home, Wallet, Receipt, Calculator, ChartLine, Settings, ChevronRight, Droplets, Building, TrendingUp, TrendingUpDown } from '@lucide/svelte';
+	import { Home, Wallet, Receipt, Calculator, ChartLine, Settings, ChevronRight, Droplets, Building, TrendingUp, TrendingUpDown, CreditCard } from '@lucide/svelte';
 
 	let assetsOpen = $state(false);
 	
@@ -105,6 +105,14 @@
 							</Collapsible.Content>
 						</SidebarMenuItem>
 					</Collapsible.Root>
+
+					<!-- Debts -->
+					<SidebarMenuItem>
+						<SidebarMenuButton href="/debts" isActive={$page.url.pathname === '/debts'}>
+							<CreditCard class="h-4 w-4" />
+							<span>Debts</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
 
 					<!-- Transactions -->
 					<SidebarMenuItem>
