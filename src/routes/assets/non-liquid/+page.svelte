@@ -29,8 +29,35 @@
 		currentValue: '',
 		purchaseDate: '',
 		location: '',
-		notes: ''
+		notes: '',
+		usefulLife: '',
+		depreciationRate: ''
 	});
+	
+	// Calculate depreciation when purchase price and useful life change
+	let annualDepreciation = $derived(() => {
+		if (formData.purchasePrice && formData.usefulLife) {
+			const price = parseFloat(formData.purchasePrice);
+			const years = parseFloat(formData.usefulLife);
+			return price / years;
+		}
+		return 0;
+	});
+	
+	let monthlyDepreciation = $derived(annualDepreciation() / 12);
+	
+	// Auto-calculate current value based on depreciation
+	function calculateDepreciatedValue() {
+		if (formData.purchasePrice && formData.purchaseDate && formData.usefulLife) {
+			const price = parseFloat(formData.purchasePrice);
+			const purchaseDate = new Date(formData.purchaseDate);
+			const now = new Date();
+			const monthsElapsed = (now.getFullYear() - purchaseDate.getFullYear()) * 12 + 
+				(now.getMonth() - purchaseDate.getMonth());
+			const depreciated = Math.max(0, price - (monthlyDepreciation * monthsElapsed));
+			formData.currentValue = depreciated.toString();
+		}
+	}
 	
 
 	function formatCurrency(amount: number): string {
@@ -73,7 +100,8 @@
 			purchaseDate: new Date(formData.purchaseDate),
 			currency: 'IDR',
 			location: formData.location || undefined,
-			notes: formData.notes || undefined
+			notes: formData.notes || undefined,
+			depreciationRate: formData.usefulLife ? (100 / parseFloat(formData.usefulLife)) : undefined
 		};
 		
 		assets = [...assets, newAsset];
@@ -87,7 +115,9 @@
 			currentValue: '',
 			purchaseDate: '',
 			location: '',
-			notes: ''
+			notes: '',
+			usefulLife: '',
+			depreciationRate: ''
 		};
 		
 		showAddModal = false;
@@ -225,124 +255,173 @@
 
 <!-- Add Asset Modal -->
 <Dialog.Root bind:open={showAddModal}>
-	<Dialog.Content class="sm:max-w-[500px]">
+	<Dialog.Content class="sm:max-w-[600px]">
 		<Dialog.Header>
 			<Dialog.Title>Add New Non-Liquid Asset</Dialog.Title>
 			<Dialog.Description>
-				Add a property, vehicle, or valuable item to track its value.
+				Add a property, vehicle, or valuable item to track its value over time.
 			</Dialog.Description>
 		</Dialog.Header>
 		
-		<form onsubmit={(e) => { e.preventDefault(); handleAddAsset(); }} class="space-y-4 max-h-[60vh] overflow-y-auto px-1">
-			<div class="space-y-2">
-				<Label for="name">Asset Name *</Label>
-				<Input
-					id="name"
-					placeholder="e.g., MacBook Pro M2"
-					bind:value={formData.name}
-					required
-				/>
-			</div>
-			
-			<div class="grid grid-cols-2 gap-4">
-				<div class="space-y-2">
-					<Label for="type">Asset Type *</Label>
-					<select
-						id="type"
-						bind:value={formData.type}
-						class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-					>
-						{#each Object.entries(nonLiquidAssetTypes) as [value, { label, icon }]}
-							<option {value}>{icon} {label}</option>
-						{/each}
-					</select>
-				</div>
-				
-				<div class="space-y-2">
-					<Label for="category">Category</Label>
-					<Input
-						id="category"
-						placeholder="e.g., Computer"
-						bind:value={formData.category}
-					/>
-				</div>
-			</div>
-			
-			<div class="grid grid-cols-2 gap-4">
-				<div class="space-y-2">
-					<Label for="purchasePrice">Purchase Price *</Label>
-					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+		<form onsubmit={(e) => { e.preventDefault(); handleAddAsset(); }} class="space-y-6 max-h-[65vh] overflow-y-auto px-1">
+			<!-- Basic Information Section -->
+			<div class="space-y-4">
+				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Basic Information</h3>
+				<div class="space-y-4 pl-1">
+					<div class="space-y-2">
+						<Label for="name">Asset Name *</Label>
 						<Input
-							id="purchasePrice"
-							type="text"
-							placeholder="0"
-							class="pl-10"
-							bind:value={formData.purchasePrice}
-							oninput={(e) => {
-								const target = e.currentTarget;
-								const value = target.value;
-								const formatted = formatNumberInput(value);
-								formData.purchasePrice = value.replace(/\D/g, '');
-								target.value = formatted;
-							}}
+							id="name"
+							placeholder="e.g., MacBook Pro M2"
+							bind:value={formData.name}
 							required
 						/>
 					</div>
-				</div>
-				
-				<div class="space-y-2">
-					<Label for="currentValue">Current Value *</Label>
-					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+					
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="type">Asset Type *</Label>
+							<select
+								id="type"
+								bind:value={formData.type}
+								class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							>
+								{#each Object.entries(nonLiquidAssetTypes) as [value, { label, icon }]}
+									<option {value}>{icon} {label}</option>
+								{/each}
+							</select>
+						</div>
+						
+						<div class="space-y-2">
+							<Label for="category">Category</Label>
+							<Input
+								id="category"
+								placeholder="e.g., Computer"
+								bind:value={formData.category}
+							/>
+						</div>
+					</div>
+					
+					<div class="space-y-2">
+						<Label for="location">Location</Label>
 						<Input
-							id="currentValue"
-							type="text"
-							placeholder="0"
-							class="pl-10"
-							bind:value={formData.currentValue}
-							oninput={(e) => {
-								const target = e.currentTarget;
-								const value = target.value;
-								const formatted = formatNumberInput(value);
-								formData.currentValue = value.replace(/\D/g, '');
-								target.value = formatted;
-							}}
-							required
+							id="location"
+							placeholder="e.g., Jakarta, Home Office"
+							bind:value={formData.location}
 						/>
 					</div>
 				</div>
 			</div>
 			
-			<div class="space-y-2">
-				<Label for="purchaseDate">Purchase Date *</Label>
-				<Input
-					id="purchaseDate"
-					type="date"
-					bind:value={formData.purchaseDate}
-					required
-				/>
+			<!-- Value & Depreciation Section -->
+			<div class="space-y-4">
+				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Value & Depreciation</h3>
+				<div class="space-y-4 pl-1">
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="purchasePrice">Purchase Price *</Label>
+							<div class="relative">
+								<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+								<Input
+									id="purchasePrice"
+									type="text"
+									placeholder="0"
+									class="pl-10"
+									bind:value={formData.purchasePrice}
+									oninput={(e) => {
+										const target = e.currentTarget;
+										const value = target.value;
+										const formatted = formatNumberInput(value);
+										formData.purchasePrice = value.replace(/\D/g, '');
+										target.value = formatted;
+										calculateDepreciatedValue();
+									}}
+									required
+								/>
+							</div>
+						</div>
+						
+						<div class="space-y-2">
+							<Label for="purchaseDate">Purchase Date *</Label>
+							<Input
+								id="purchaseDate"
+								type="date"
+								bind:value={formData.purchaseDate}
+								onchange={calculateDepreciatedValue}
+								required
+							/>
+						</div>
+					</div>
+					
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="usefulLife">Masa Manfaat (Years)</Label>
+							<Input
+								id="usefulLife"
+								type="number"
+								placeholder="e.g., 5"
+								min="1"
+								bind:value={formData.usefulLife}
+								onchange={calculateDepreciatedValue}
+							/>
+							<p class="text-xs text-muted-foreground">Useful life for depreciation</p>
+						</div>
+						
+						<div class="space-y-2">
+							<Label>Annual Depreciation</Label>
+							<div class="h-10 px-3 py-2 text-sm bg-muted rounded-md flex items-center">
+								{annualDepreciation() > 0 ? formatCurrency(annualDepreciation()) : '-'}
+							</div>
+							<p class="text-xs text-muted-foreground">Straight-line method</p>
+						</div>
+					</div>
+					
+					<div class="space-y-2">
+						<Label for="currentValue">Current Value *</Label>
+						<div class="relative">
+							<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+							<Input
+								id="currentValue"
+								type="text"
+								placeholder="0"
+								class="pl-10"
+								bind:value={formData.currentValue}
+								oninput={(e) => {
+									const target = e.currentTarget;
+									const value = target.value;
+									const formatted = formatNumberInput(value);
+									formData.currentValue = value.replace(/\D/g, '');
+									target.value = formatted;
+								}}
+								required
+							/>
+						</div>
+						{#if formData.usefulLife && formData.purchasePrice && formData.purchaseDate}
+							<p class="text-xs text-muted-foreground">
+								Auto-calculated based on depreciation. You can override if needed.
+							</p>
+						{/if}
+					</div>
+				</div>
 			</div>
 			
-			<div class="space-y-2">
-				<Label for="location">Location</Label>
-				<Input
-					id="location"
-					placeholder="e.g., Jakarta, Home Office"
-					bind:value={formData.location}
-				/>
+			<!-- Additional Information Section -->
+			<div class="space-y-4">
+				<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Additional Information</h3>
+				<div class="space-y-4 pl-1">
+					<div class="space-y-2">
+						<Label for="notes">Notes</Label>
+						<textarea
+							id="notes"
+							placeholder="Additional details about the asset..."
+							bind:value={formData.notes}
+							class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						/>
+					</div>
+				</div>
 			</div>
 			
-			<div class="space-y-2">
-				<Label for="notes">Notes</Label>
-				<Input
-					id="notes"
-					placeholder="Additional details..."
-					bind:value={formData.notes}
-				/>
-			</div>
-			
-			<Dialog.Footer>
+			<Dialog.Footer class="sticky bottom-0 bg-background pt-4 border-t">
 				<Button type="button" variant="outline" onclick={() => showAddModal = false}>
 					Cancel
 				</Button>
