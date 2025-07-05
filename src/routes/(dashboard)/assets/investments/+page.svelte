@@ -11,7 +11,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import type { PageData, ActionData } from './$types';
-
+	
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	
 	// Modal states
@@ -31,7 +31,7 @@
 		shares: '',
 		notes: ''
 	});
-
+	
 	// Format currency for display
 	function displayCurrency(value: string | number) {
 		const amount = typeof value === 'string' ? parseFloat(value) : value;
@@ -48,7 +48,7 @@
 		
 		return formatter.format(amount);
 	}
-
+	
 	// Format date for display
 	function displayDate(dateString: string | Date | null) {
 		if (!dateString) return '-';
@@ -105,16 +105,15 @@
 		if (!shares || parseFloat(shares) === 0) return null;
 		return parseFloat(value) / parseFloat(shares);
 	}
-	
 </script>
 
 <div class="p-8 space-y-6">
+
 	<!-- Header -->
 	<PageHeader 
-		title="Investment Assets"
-		description="Manage your stocks, crypto, and other investments"
+		title="Investments"
+		description="Track your investment portfolio and performance"
 		actionLabel="Add Investment"
-		actionIcon={Plus}
 		onAction={() => showAddModal = true}
 	/>
 
