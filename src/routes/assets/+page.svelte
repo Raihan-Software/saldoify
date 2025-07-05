@@ -7,7 +7,7 @@
 	let liquidAssets = $state([...mockLiquidAssets]);
 </script>
 
-<div class="container mx-auto p-6 max-w-7xl">
+<div class="p-8 max-w-7xl">
 	<div class="mb-8">
 		<h1 class="text-3xl font-bold mb-2">Assets</h1>
 		<p class="text-muted-foreground">Manage and track your financial assets</p>

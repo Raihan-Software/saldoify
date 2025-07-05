@@ -5,19 +5,16 @@
 	let { children } = $props();
 </script>
 
-<div class="flex h-screen">
+<div class="flex h-screen bg-gray-50 dark:bg-gray-950">
 	<AppSidebar />
 	
 	<!-- Main content area -->
 	<div class="flex-1 lg:ml-64">
-		<!-- Optional header -->
-		<header class="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-white dark:bg-gray-900 px-6">
-			<!-- Header content can go here -->
-		</header>
-		
-		<!-- Page content -->
-		<main class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950">
-			{@render children()}
+		<!-- Page content with no header -->
+		<main class="h-full overflow-y-auto">
+			<div class="container mx-auto">
+				{@render children()}
+			</div>
 		</main>
 	</div>
 </div>

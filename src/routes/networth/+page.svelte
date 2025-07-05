@@ -33,7 +33,7 @@
 	}
 </script>
 
-<div class="container mx-auto p-6 space-y-8">
+<div class="p-8 space-y-8">
 	<!-- Header -->
 	<div class="mb-8">
 		<h1 class="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">Net Worth</h1>

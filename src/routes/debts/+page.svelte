@@ -84,7 +84,7 @@
 	}
 </script>
 
-<div class="container mx-auto p-6 space-y-8">
+<div class="p-8 space-y-8">
 	<!-- Header -->
 	<div class="flex items-center justify-between mb-8">
 		<div>
