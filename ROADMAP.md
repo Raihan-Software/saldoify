@@ -24,9 +24,8 @@ Saldoify is a personal finance management application built with SvelteKit, focu
 
 - [ ] **Assets Management**
   - [x] Liquid Assets (cash, savings, checking accounts)
-  - [ ] Investment Assets (stocks, mutual funds, bonds)
-  - [ ] Non-Liquid Assets (property, vehicles, equipment)
-  - [ ] Other Assets (collectibles, receivables)
+  - [x] Investment Assets (stocks, mutual funds, bonds)
+  - [x] Non-Liquid Assets (property, vehicles, equipment)
   - Asset allocation charts
   - Performance tracking visualizations
 
