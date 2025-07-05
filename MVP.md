@@ -11,11 +11,11 @@ The Minimum Viable Product (MVP) focuses on delivering core financial tracking f
 **Purpose**: Secure user access and data isolation
 
 **Features**:
-- [ ] User registration with email verification
-- [ ] Secure login with session management
-- [ ] Password reset functionality
-- [ ] User profile management
-- [ ] Session expiry and renewal
+- [x] User registration with email 
+- [x] Secure login with session management
+- [x] Password reset functionality
+- [x] User profile management
+- [x] Session expiry and renewal
 
 **Technical Requirements**:
 - Argon2 password hashing
