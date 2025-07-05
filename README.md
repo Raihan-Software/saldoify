@@ -96,6 +96,29 @@ docker-compose exec app npm run db:push
 docker-compose exec app npm run db:studio
 ```
 
+## Development with Docker (Live Reload)
+
+For development with hot reload and live changes:
+
+```bash
+# Start development environment
+docker-compose -f docker-compose.dev.yml up
+
+# Or run in background
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+This will:
+- Mount your local code into the container
+- Enable hot reload on file changes
+- Run the development server on http://localhost:5173
+- Keep PostgreSQL on port 5436
+
+To stop the development environment:
+```bash
+docker-compose -f docker-compose.dev.yml down
+```
+
 ## Local Development (without Docker)
 
 If you prefer to develop locally without Docker:
