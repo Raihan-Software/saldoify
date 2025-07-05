@@ -1,41 +1,22 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Mail, ArrowLeft, Loader2, CheckCircle } from '@lucide/svelte';
+	import type { ActionData } from './$types';
 	
-	let email = $state('');
+	let { form }: { form: ActionData } = $props();
+	
 	let isLoading = $state(false);
-	let isSuccess = $state(false);
-	let errors = $state<{ email?: string; general?: string }>({});
+	let submittedEmail = $state('');
 	
-	function validateForm() {
-		const newErrors: typeof errors = {};
-		
-		if (!email) {
-			newErrors.email = 'Email is required';
-		} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-			newErrors.email = 'Please enter a valid email';
+	$effect(() => {
+		if (form?.success) {
+			submittedEmail = form.email;
 		}
-		
-		errors = newErrors;
-		return Object.keys(newErrors).length === 0;
-	}
-	
-	async function handleSubmit(e: Event) {
-		e.preventDefault();
-		
-		if (!validateForm()) return;
-		
-		isLoading = true;
-		
-		// Simulate API call
-		setTimeout(() => {
-			isLoading = false;
-			isSuccess = true;
-		}, 1500);
-	}
+	});
 </script>
 
 <Card class="shadow-xl border-0">
@@ -46,7 +27,7 @@
 		</CardDescription>
 	</CardHeader>
 	<CardContent>
-		{#if isSuccess}
+		{#if form?.success || submittedEmail}
 			<div class="space-y-4">
 				<div class="flex justify-center">
 					<div class="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
@@ -57,18 +38,18 @@
 				<div class="text-center space-y-2">
 					<h3 class="font-semibold text-lg">Check your email</h3>
 					<p class="text-sm text-muted-foreground">
-						We've sent password reset instructions to {email}
+						We've sent password reset instructions to {submittedEmail || form?.email}
 					</p>
 				</div>
 				
-				<Button href="/login" class="w-full">
-					Back to Sign In
-				</Button>
+				<a href="/login" class="w-full">
+					<Button class="w-full">Back to Sign In</Button>
+				</a>
 				
 				<p class="text-center text-sm text-muted-foreground">
 					Didn't receive the email? Check your spam folder or{' '}
 					<button 
-						onclick={() => { isSuccess = false; email = ''; }} 
+						onclick={() => { submittedEmail = ''; }} 
 						class="font-medium text-primary hover:underline"
 					>
 						try another email
@@ -76,28 +57,40 @@
 				</p>
 			</div>
 		{:else}
-			<form onsubmit={handleSubmit} class="space-y-4">
+			<form 
+				method="POST" 
+				class="space-y-4"
+				use:enhance={() => {
+					isLoading = true;
+					return async ({ update }) => {
+						await update();
+						isLoading = false;
+					};
+				}}
+			>
 				<div class="space-y-2">
 					<Label for="email">Email</Label>
 					<div class="relative">
 						<Mail class="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
 						<Input
 							id="email"
+							name="email"
 							type="email"
 							placeholder="john@example.com"
-							bind:value={email}
+							value={form?.email || ''}
 							class="pl-9"
 							disabled={isLoading}
+							required
 						/>
 					</div>
-					{#if errors.email}
-						<p class="text-sm text-red-500">{errors.email}</p>
+					{#if form?.errors?.email}
+						<p class="text-sm text-red-500">{form.errors.email}</p>
 					{/if}
 				</div>
 				
-				{#if errors.general}
+				{#if form?.errors?.general}
 					<div class="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-950 rounded-md">
-						{errors.general}
+						{form.errors.general}
 					</div>
 				{/if}
 				

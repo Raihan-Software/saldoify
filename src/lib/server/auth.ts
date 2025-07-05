@@ -1,13 +1,19 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { sha256 } from '@oslojs/crypto/sha2';
-import { encodeBase64url, encodeHexLowerCase } from '@oslojs/encoding';
+import { encodeBase64url, encodeHexLowerCase, encodeBase32LowerCase } from '@oslojs/encoding';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
 export const sessionCookieName = 'auth-session';
+
+function generateId(): string {
+	const bytes = crypto.getRandomValues(new Uint8Array(15));
+	const id = encodeBase32LowerCase(bytes);
+	return id;
+}
 
 export function generateSessionToken() {
 	const bytes = crypto.getRandomValues(new Uint8Array(18));
@@ -86,4 +92,53 @@ export function deleteSessionTokenCookie(event: RequestEvent) {
 	event.cookies.delete(sessionCookieName, {
 		path: '/'
 	});
+}
+
+// Password reset token functions
+export function generatePasswordResetToken() {
+	const bytes = crypto.getRandomValues(new Uint8Array(32));
+	const token = encodeBase64url(bytes);
+	return token;
+}
+
+export async function createPasswordResetToken(userId: string, email: string) {
+	// Delete any existing tokens for this user
+	await db.delete(table.passwordResetToken).where(eq(table.passwordResetToken.userId, userId));
+	
+	const token = generatePasswordResetToken();
+	const tokenId = generateId();
+	const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+	
+	await db.insert(table.passwordResetToken).values({
+		id: tokenId,
+		userId,
+		email,
+		token,
+		expiresAt
+	});
+	
+	return token;
+}
+
+export async function validatePasswordResetToken(token: string) {
+	const [resetToken] = await db
+		.select()
+		.from(table.passwordResetToken)
+		.where(eq(table.passwordResetToken.token, token));
+	
+	if (!resetToken) {
+		return { valid: false, token: null };
+	}
+	
+	// Check if token is expired
+	if (Date.now() >= resetToken.expiresAt.getTime()) {
+		await db.delete(table.passwordResetToken).where(eq(table.passwordResetToken.id, resetToken.id));
+		return { valid: false, token: null };
+	}
+	
+	return { valid: true, token: resetToken };
+}
+
+export async function deletePasswordResetToken(token: string) {
+	await db.delete(table.passwordResetToken).where(eq(table.passwordResetToken.token, token));
 }
