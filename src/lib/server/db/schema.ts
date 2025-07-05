@@ -2,9 +2,12 @@ import { pgTable, serial, integer, text, timestamp } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
 	id: text('id').primaryKey(),
-	age: integer('age'),
-	username: text('username').notNull().unique(),
-	passwordHash: text('password_hash').notNull()
+	email: text('email').notNull().unique(),
+	name: text('name').notNull(),
+	username: text('username').unique(), // Made optional for backward compatibility
+	passwordHash: text('password_hash').notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 export const session = pgTable('session', {
