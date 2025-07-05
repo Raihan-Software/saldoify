@@ -3,6 +3,7 @@ import { encodeBase32LowerCase } from '@oslojs/encoding';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { createDefaultPreferences } from './preferences';
 
 // Generate a user ID with 120 bits of entropy
 export function generateUserId(): string {
@@ -59,6 +60,9 @@ export async function createUser(input: CreateUserInput) {
 				updatedAt: new Date()
 			})
 			.returning();
+		
+		// Create default preferences for the new user
+		await createDefaultPreferences(newUser.id);
 		
 		return {
 			id: newUser.id,

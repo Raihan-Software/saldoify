@@ -1,14 +1,18 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import { Plus, Edit2, Trash2, Save, X, Settings2, CreditCard, Wallet, Receipt, Tag } from '@lucide/svelte';
+	import { Plus, Edit2, Trash2, Save, X, Settings2, CreditCard, Wallet, Receipt, Tag, Loader2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Switch } from '$lib/components/ui/switch';
 	import PageHeader from '$lib/components/page-header.svelte';
+	import type { PageData, ActionData } from './$types';
+	
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	// Import existing types
 	import { liabilityTypes } from '$lib/modules/networth/networth-data';
@@ -93,10 +97,12 @@
 	let newAssetType = $state({ label: '', icon: '' });
 	let newTransactionType = $state({ label: '' });
 	
-	// General settings states
-	let showDecimals = $state(true);
-	let compactNumbers = $state(false);
-	let hideBalances = $state(false);
+	// General settings states - initialize from server data
+	let currency = $state(data?.preferences?.currencyCode || 'IDR');
+	let currencyDisplay = $state(data?.preferences?.currencyDisplay || 'symbol');
+	let numberFormat = $state(data?.preferences?.numberFormat || '1.234.567,89');
+	let compactNumbers = $state(data?.preferences?.compactNumbers || false);
+	let isLoading = $state(false);
 
 	// Helper functions
 	function saveDebtType(id: string, newLabel: string) {
@@ -397,85 +403,113 @@
 
 		<!-- General Settings Tab -->
 		<TabsContent value="general" class="mt-6">
-			<div class="grid gap-6">
-				<!-- Currency Settings -->
-				<Card class="border shadow-sm">
-					<CardHeader>
-						<CardTitle class="text-xl">Currency Settings</CardTitle>
-						<CardDescription>Configure your default currency and display preferences</CardDescription>
-					</CardHeader>
-					<CardContent class="space-y-4">
-						<div class="grid gap-4">
-							<div class="grid gap-2">
-								<Label for="currency">Default Currency</Label>
-								<select
-									id="currency"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="IDR" selected>IDR - Indonesian Rupiah</option>
-									<option value="USD">USD - US Dollar</option>
-									<option value="EUR">EUR - Euro</option>
-									<option value="SGD">SGD - Singapore Dollar</option>
-									<option value="MYR">MYR - Malaysian Ringgit</option>
-									<option value="JPY">JPY - Japanese Yen</option>
-									<option value="GBP">GBP - British Pound</option>
-									<option value="AUD">AUD - Australian Dollar</option>
-								</select>
-							</div>
-							<div class="grid gap-2">
-								<Label for="currency-display">Currency Display</Label>
-								<select
-									id="currency-display"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="symbol" selected>Symbol (Rp)</option>
-									<option value="code">Code (IDR)</option>
-									<option value="both">Both (IDR Rp)</option>
-								</select>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
-
-				<!-- Display Preferences -->
-				<Card class="border shadow-sm">
-					<CardHeader>
-						<CardTitle class="text-xl">Display Preferences</CardTitle>
-						<CardDescription>Customize how information is displayed</CardDescription>
-					</CardHeader>
-					<CardContent class="space-y-4">
-						<div class="grid gap-4">
-							<div class="grid gap-2">
-								<Label for="number-format">Number Format</Label>
-								<select
-									id="number-format"
-									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-								>
-									<option value="1.234.567,89" selected>1.234.567,89 (Indonesia)</option>
-									<option value="1,234,567.89">1,234,567.89 (US/UK)</option>
-									<option value="1 234 567,89">1 234 567,89 (France)</option>
-									<option value="1'234'567.89">1'234'567.89 (Switzerland)</option>
-								</select>
-							</div>
-							<div class="flex items-center justify-between">
-								<div class="space-y-0.5">
-									<Label for="compact-numbers">Compact Numbers</Label>
-									<p class="text-sm text-muted-foreground">Show large numbers as 1.5M instead of 1,500,000</p>
+			<form 
+				method="POST"
+				use:enhance={() => {
+					isLoading = true;
+					return async ({ update }) => {
+						await update();
+						isLoading = false;
+					};
+				}}
+			>
+				<div class="grid gap-6">
+					<!-- Currency Settings -->
+					<Card class="border shadow-sm">
+						<CardHeader>
+							<CardTitle class="text-xl">Currency Settings</CardTitle>
+							<CardDescription>Configure your default currency and display preferences</CardDescription>
+						</CardHeader>
+						<CardContent class="space-y-4">
+							<div class="grid gap-4">
+								<div class="grid gap-2">
+									<Label for="currency">Default Currency</Label>
+									<select
+										id="currency"
+										name="currency"
+										bind:value={currency}
+										class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+									>
+										{#each data.currencies as curr}
+											<option value={curr.code}>{curr.code} - {curr.name}</option>
+										{/each}
+									</select>
 								</div>
-								<Switch id="compact-numbers" bind:checked={compactNumbers} />
+								<div class="grid gap-2">
+									<Label for="currency-display">Currency Display</Label>
+									<select
+										id="currency-display"
+										name="currency-display"
+										bind:value={currencyDisplay}
+										class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+									>
+										<option value="symbol">Symbol ({data.currencies.find(c => c.code === currency)?.symbol || '$'})</option>
+										<option value="code">Code ({currency})</option>
+										<option value="both">Both ({currency} {data.currencies.find(c => c.code === currency)?.symbol || '$'})</option>
+									</select>
+								</div>
 							</div>
-						</div>
-					</CardContent>
-				</Card>
+						</CardContent>
+					</Card>
 
-				<!-- Save Changes Button -->
-				<div class="flex justify-end mt-8">
-					<Button size="lg" class="min-w-[200px]">
-						<Save class="mr-2 h-5 w-5" />
-						Save All Changes
-					</Button>
+					<!-- Display Preferences -->
+					<Card class="border shadow-sm">
+						<CardHeader>
+							<CardTitle class="text-xl">Display Preferences</CardTitle>
+							<CardDescription>Customize how information is displayed</CardDescription>
+						</CardHeader>
+						<CardContent class="space-y-4">
+							<div class="grid gap-4">
+								<div class="grid gap-2">
+									<Label for="number-format">Number Format</Label>
+									<select
+										id="number-format"
+										name="number-format"
+										bind:value={numberFormat}
+										class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+									>
+										{#each data.numberFormats as format}
+											<option value={format.value}>{format.label}</option>
+										{/each}
+									</select>
+								</div>
+								<div class="flex items-center justify-between">
+									<div class="space-y-0.5">
+										<Label for="compact-numbers">Compact Numbers</Label>
+										<p class="text-sm text-muted-foreground">Show large numbers as 1.5M instead of 1,500,000</p>
+									</div>
+									<Switch id="compact-numbers" name="compact-numbers" bind:checked={compactNumbers} />
+								</div>
+							</div>
+						</CardContent>
+					</Card>
+
+					<!-- Save Changes Button -->
+					<div class="flex justify-end mt-8">
+						<Button type="submit" size="lg" class="min-w-[200px]" disabled={isLoading}>
+							{#if isLoading}
+								<Loader2 class="mr-2 h-5 w-5 animate-spin" />
+								Saving...
+							{:else}
+								<Save class="mr-2 h-5 w-5" />
+								Save All Changes
+							{/if}
+						</Button>
+					</div>
+					
+					{#if form?.success}
+						<div class="mt-4 p-4 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200 rounded-lg">
+							Settings saved successfully!
+						</div>
+					{/if}
+					
+					{#if form?.error}
+						<div class="mt-4 p-4 bg-red-50 dark:bg-red-950 text-red-800 dark:text-red-200 rounded-lg">
+							{form.error}
+						</div>
+					{/if}
 				</div>
-			</div>
+			</form>
 		</TabsContent>
 	</Tabs>
 	</div>
