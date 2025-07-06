@@ -9,16 +9,12 @@
 		ArrowUpRight, ArrowDownRight, MoreHorizontal, Eye, EyeOff, Receipt
 	} from '@lucide/svelte';
 	import type { PageData } from './$types';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	
 	let { data }: { data: PageData } = $props();
 	
 	// Use real data from server
-	let netWorthData = $derived(data.netWorthData);
 	let showBalances = $state(true);
-	let recentTransactions = $derived(data.recentTransactions);
-	let monthlyData = $derived(data.monthlyData);
-	let topCategories = $derived(data.topCategories);
-	let accountBalances = $derived(data.accountBalances);
 	
 	// Get transaction icon based on type
 	function getCategoryIcon(type: string): string {
@@ -35,18 +31,14 @@
 	}
 	
 	function formatCurrency(amount: number): string {
-		if (!showBalances) return `${data.preferences?.currencySymbol || 'Rp'} ***`;
+		if (!showBalances) return `IDR ***`;
 		
 		const formatter = new Intl.NumberFormat('en-US', {
 			style: 'currency',
-			currency: data.preferences?.currencyCode || 'IDR',
+			currency: 'IDR',
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 0
 		});
-		
-		if (data.preferences?.currencyDisplay === 'code') {
-			return formatter.format(amount).replace(/[A-Z]{3}/, data.preferences.currencyCode);
-		}
 		
 		return formatter.format(amount);
 	}
@@ -102,6 +94,59 @@
 			</Button>
 		</div>
 		
+		{#await data.dashboardData}
+			<!-- Loading state -->
+			<Card class="relative overflow-hidden border-0 bg-gradient-to-br from-blue-600 to-purple-600 text-white">
+				<CardContent class="p-8">
+					<div class="relative z-10">
+						<div class="flex items-center justify-between mb-6">
+							<div>
+								<p class="text-blue-100 text-sm font-medium">NET WORTH</p>
+								<Skeleton class="h-12 w-48 mt-2 bg-white/20" />
+							</div>
+							<div class="text-right">
+								<p class="text-blue-100 text-sm">Monthly Savings</p>
+								<Skeleton class="h-8 w-32 mt-1 bg-white/20" />
+							</div>
+						</div>
+						
+						<div class="grid grid-cols-3 gap-6">
+							<div>
+								<p class="text-blue-100 text-sm">Total Assets</p>
+								<Skeleton class="h-7 w-28 mt-1 bg-white/20" />
+							</div>
+							<div>
+								<p class="text-blue-100 text-sm">Total Liabilities</p>
+								<Skeleton class="h-7 w-28 mt-1 bg-white/20" />
+							</div>
+							<div>
+								<p class="text-blue-100 text-sm">Savings Rate</p>
+								<Skeleton class="h-7 w-20 mt-1 bg-white/20" />
+							</div>
+						</div>
+					</div>
+					<!-- Background decoration -->
+					<div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
+					<div class="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
+				</CardContent>
+			</Card>
+			
+			<!-- Loading state for metrics -->
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+				{#each Array(4) as _}
+					<Card>
+						<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+							<Skeleton class="h-4 w-32" />
+							<Skeleton class="h-4 w-4" />
+						</CardHeader>
+						<CardContent>
+							<Skeleton class="h-8 w-32 mb-1" />
+							<Skeleton class="h-4 w-24" />
+						</CardContent>
+					</Card>
+				{/each}
+			</div>
+		{:then dashboardData}
 		<!-- Net Worth Hero Card -->
 		<Card class="relative overflow-hidden border-0 bg-gradient-to-br from-blue-600 to-purple-600 text-white">
 			<CardContent class="p-8">
@@ -109,26 +154,26 @@
 					<div class="flex items-center justify-between mb-6">
 						<div>
 							<p class="text-blue-100 text-sm font-medium">NET WORTH</p>
-							<p class="text-5xl font-bold mt-2">{formatCurrency(netWorthData.netWorth)}</p>
+							<p class="text-5xl font-bold mt-2">{formatCurrency(dashboardData.netWorthData.netWorth)}</p>
 						</div>
 						<div class="text-right">
 							<p class="text-blue-100 text-sm">Monthly Savings</p>
-							<p class="text-2xl font-semibold">{formatCurrency(monthlyData.net)}</p>
+							<p class="text-2xl font-semibold">{formatCurrency(dashboardData.monthlyData.net)}</p>
 						</div>
 					</div>
 					
 					<div class="grid grid-cols-3 gap-6">
 						<div>
 							<p class="text-blue-100 text-sm">Total Assets</p>
-							<p class="text-xl font-semibold">{formatCurrency(netWorthData.assets.total)}</p>
+							<p class="text-xl font-semibold">{formatCurrency(dashboardData.netWorthData.assets.total)}</p>
 						</div>
 						<div>
 							<p class="text-blue-100 text-sm">Total Liabilities</p>
-							<p class="text-xl font-semibold">{formatCurrency(netWorthData.liabilities.total)}</p>
+							<p class="text-xl font-semibold">{formatCurrency(dashboardData.netWorthData.liabilities.total)}</p>
 						</div>
 						<div>
 							<p class="text-blue-100 text-sm">Savings Rate</p>
-							<p class="text-xl font-semibold">{monthlyData.savingsRate.toFixed(1)}%</p>
+							<p class="text-xl font-semibold">{dashboardData.monthlyData.savingsRate.toFixed(1)}%</p>
 						</div>
 					</div>
 				</div>
@@ -146,7 +191,7 @@
 					<TrendingUp class="h-4 w-4 text-green-600" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{formatCurrency(monthlyData.income)}</div>
+					<div class="text-2xl font-bold">{formatCurrency(dashboardData.monthlyData.income)}</div>
 					<p class="text-xs text-muted-foreground mt-1">
 						This month's earnings
 					</p>
@@ -159,7 +204,7 @@
 					<TrendingDown class="h-4 w-4 text-red-600" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{formatCurrency(monthlyData.expenses)}</div>
+					<div class="text-2xl font-bold">{formatCurrency(dashboardData.monthlyData.expenses)}</div>
 					<p class="text-xs text-muted-foreground mt-1">
 						This month's spending
 					</p>
@@ -172,7 +217,7 @@
 					<Wallet class="h-4 w-4 text-blue-600" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{formatCurrency(netWorthData.assets.investment)}</div>
+					<div class="text-2xl font-bold">{formatCurrency(dashboardData.netWorthData.assets.investment)}</div>
 					<p class="text-xs text-muted-foreground mt-1">
 						Stocks, crypto & funds
 					</p>
@@ -185,13 +230,14 @@
 					<PiggyBank class="h-4 w-4 text-green-600" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{formatCurrency(netWorthData.assets.liquid)}</div>
+					<div class="text-2xl font-bold">{formatCurrency(dashboardData.netWorthData.assets.liquid)}</div>
 					<p class="text-xs text-muted-foreground mt-1">
 						Cash & bank accounts
 					</p>
 				</CardContent>
 			</Card>
 		</div>
+		{/await}
 		
 		<div class="grid gap-6 lg:grid-cols-3">
 			<!-- Recent Transactions -->
@@ -206,8 +252,25 @@
 					</div>
 				</CardHeader>
 				<CardContent>
+					{#await data.dashboardData}
+						{#each Array(5) as _}
+							<div class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+								<div class="flex items-center gap-3">
+									<Skeleton class="w-10 h-10 rounded-full" />
+									<div>
+										<Skeleton class="h-4 w-32 mb-1" />
+										<Skeleton class="h-3 w-20" />
+									</div>
+								</div>
+								<div class="text-right">
+									<Skeleton class="h-5 w-24 mb-1" />
+									<Skeleton class="h-3 w-16" />
+								</div>
+							</div>
+						{/each}
+					{:then dashboardData}
 					<div class="space-y-3">
-						{#each recentTransactions as transaction}
+						{#each dashboardData.recentTransactions as transaction}
 							<div class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
 								<div class="flex items-center gap-3">
 									<div class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg">
@@ -227,6 +290,7 @@
 							</div>
 						{/each}
 					</div>
+					{/await}
 				</CardContent>
 			</Card>
 			
@@ -237,7 +301,21 @@
 				</CardHeader>
 				<CardContent>
 					<div class="space-y-4">
-						{#each accountBalances as account}
+						{#await data.dashboardData}
+							{#each Array(3) as _}
+								<div class="space-y-2">
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-2">
+											<Skeleton class="w-4 h-4 rounded-full" />
+											<Skeleton class="h-4 w-32 mb-1" />
+										</div>
+										<Skeleton class="h-5 w-24 mb-1" />
+									</div>
+									<Skeleton class="h-2" />
+								</div>
+							{/each}
+						{:then dashboardData}
+						{#each dashboardData.accountBalances as account}
 							<div class="space-y-2">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-2">
@@ -250,42 +328,17 @@
 								</div>
 								{#if account.amount > 0}
 									<Progress 
-										value={(account.amount / netWorthData.assets.total) * 100} 
+										value={(account.amount / dashboardData.netWorthData.assets.total) * 100} 
 										class="h-2"
 									/>
 								{/if}
 							</div>
 						{/each}
+						{/await}
 					</div>
 				</CardContent>
 			</Card>
 		</div>
-		
-		<!-- Spending by Category -->
-		<Card>
-			<CardHeader>
-				<CardTitle>Top Spending Categories</CardTitle>
-				<CardDescription>This month's expense breakdown</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-					{#each topCategories as category}
-						<div class="space-y-2">
-							<div class="flex items-center justify-between">
-								<span class="text-sm font-medium">{category.label}</span>
-								<span class="text-sm text-muted-foreground">
-									{formatCompactCurrency(category.amount)}
-								</span>
-							</div>
-							<Progress 
-								value={(category.amount / monthlyData.expenses) * 100} 
-								class="h-2"
-							/>
-						</div>
-					{/each}
-				</div>
-			</CardContent>
-		</Card>
 		
 		<!-- Quick Actions -->
 		<div class="grid gap-4 md:grid-cols-4">

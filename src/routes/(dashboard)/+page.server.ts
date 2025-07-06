@@ -12,6 +12,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const now = new Date();
 	const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 	
+	return {
+		preferences: getUserPreferences(locals.user.id),
+		dashboardData: loadDashboardData(locals.user.id, now, startOfMonth)
+	};
+};
+
+async function loadDashboardData(userId: string, now: Date, startOfMonth: Date) {
 	// Fetch all data in parallel
 	const [
 		liquidAssets,
@@ -23,20 +30,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 		debts,
 		debtSummary,
 		allTransactions,
-		monthlyTotals,
-		preferences
+		monthlyTotals
 	] = await Promise.all([
-		getUserAssetsByType(locals.user.id, 'liquid'),
-		getAssetSummaryByType(locals.user.id, 'liquid'),
-		getUserAssetsByType(locals.user.id, 'non_liquid'),
-		getAssetSummaryByType(locals.user.id, 'non_liquid'),
-		getUserAssetsByType(locals.user.id, 'investment'),
-		getAssetSummaryByType(locals.user.id, 'investment'),
-		getUserDebts(locals.user.id),
-		getDebtSummary(locals.user.id),
-		getUserTransactions(locals.user.id),
-		getMonthlyTransactionSummary(locals.user.id, now.getFullYear(), now.getMonth() + 1),
-		getUserPreferences(locals.user.id)
+		getUserAssetsByType(userId, 'liquid'),
+		getAssetSummaryByType(userId, 'liquid'),
+		getUserAssetsByType(userId, 'non_liquid'),
+		getAssetSummaryByType(userId, 'non_liquid'),
+		getUserAssetsByType(userId, 'investment'),
+		getAssetSummaryByType(userId, 'investment'),
+		getUserDebts(userId),
+		getDebtSummary(userId),
+		getUserTransactions(userId),
+		getMonthlyTransactionSummary(userId, now.getFullYear(), now.getMonth() + 1)
 	]);
 	
 	// Get recent transactions (last 10)
@@ -95,9 +100,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		accountBalances: [
 			{ name: 'Liquid Assets', amount: liquidSummary.totalValue, icon: '💵', color: 'text-green-600' },
 			{ name: 'Investments', amount: investmentSummary.totalValue, icon: '📈', color: 'text-blue-600' },
-			{ name: 'Properties', amount: nonLiquidSummary.totalValue, icon: '🏠', color: 'text-purple-600' },
+			{ name: 'Non-Liquid Assets', amount: nonLiquidSummary.totalValue, icon: '📦', color: 'text-purple-600' },
 			{ name: 'Total Debt', amount: -totalLiabilities, icon: '💳', color: 'text-red-600' }
-		],
-		preferences
+		]
 	};
-};
+}
