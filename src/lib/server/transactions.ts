@@ -326,6 +326,7 @@ export async function deleteTransaction(userId: string, transactionId: string) {
 }
 
 // Get monthly summary
+// exclude transfers from the summary
 export async function getMonthlyTransactionSummary(userId: string, year: number, month: number) {
 	const startDate = new Date(year, month - 1, 1);
 	const endDate = new Date(year, month, 0, 23, 59, 59, 999);
@@ -336,11 +337,16 @@ export async function getMonthlyTransactionSummary(userId: string, year: number,
 			total: sql<string>`sum(${table.transactions.amount})::numeric`
 		})
 		.from(table.transactions)
+		.leftJoin(
+			table.transactionCategories,
+			eq(table.transactions.categoryId, table.transactionCategories.id)
+		)
 		.where(
 			and(
 				eq(table.transactions.userId, userId),
 				gte(table.transactions.transactionDate, startDate),
-				lte(table.transactions.transactionDate, endDate)
+				lte(table.transactions.transactionDate, endDate),
+				sql`${table.transactionCategories.type} != 'transfer'`
 			)
 		)
 		.groupBy(table.transactions.type);
