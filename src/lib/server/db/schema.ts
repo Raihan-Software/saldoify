@@ -133,6 +133,35 @@ export const assets = pgTable('assets', {
 	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
+// Debts table
+export const debts = pgTable('debts', {
+	id: text('id').primaryKey(),
+	userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+	
+	// Debt details
+	name: text('name').notNull(),
+	debtTypeId: text('debt_type_id').notNull().references(() => debtTypes.id),
+	
+	// Financial data
+	balance: decimal('balance', { precision: 15, scale: 2 }).notNull(), // Current outstanding balance
+	originalAmount: decimal('original_amount', { precision: 15, scale: 2 }), // Original loan amount
+	
+	// Payment details
+	interestRate: decimal('interest_rate', { precision: 5, scale: 2 }), // Annual percentage rate
+	monthlyPayment: decimal('monthly_payment', { precision: 15, scale: 2 }), // Fixed monthly payment amount
+	
+	// Dates
+	startDate: timestamp('start_date', { withTimezone: true, mode: 'date' }),
+	dueDate: timestamp('due_date', { withTimezone: true, mode: 'date' }),
+	
+	// Additional info
+	notes: text('notes'),
+	
+	// Metadata
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
+});
+
 // Transactions table
 export const transactions = pgTable('transactions', {
 	id: text('id').primaryKey(),
@@ -168,5 +197,7 @@ export type AssetType = typeof assetTypes.$inferSelect;
 export type TransactionCategory = typeof transactionCategories.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
 export type InsertAsset = typeof assets.$inferInsert;
+export type Debt = typeof debts.$inferSelect;
+export type InsertDebt = typeof debts.$inferInsert;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = typeof transactions.$inferInsert;

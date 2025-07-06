@@ -4,7 +4,7 @@ import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { createDefaultPreferences } from './preferences';
-import { createDefaultDebtTypes } from './debt-types';
+import { initializeUserDebtTypes } from './debt-types';
 import { createDefaultAssetTypes } from './asset-types';
 import { createDefaultTransactionCategories } from './transaction-categories';
 
@@ -68,7 +68,7 @@ export async function createUser(input: CreateUserInput) {
 		await createDefaultPreferences(newUser.id);
 		
 		// Create default debt types for the new user
-		await createDefaultDebtTypes(newUser.id);
+		await initializeUserDebtTypes(newUser.id);
 		
 		// Create default asset types for the new user
 		await createDefaultAssetTypes(newUser.id);

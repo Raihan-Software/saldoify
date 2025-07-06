@@ -3,10 +3,6 @@
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { Badge } from '$lib/components/ui/badge';
 	import PageHeader from '$lib/components/page-header.svelte';
-	import { 
-		liabilityTypes,
-		mockLiabilities
-	} from '$lib/modules/networth/networth-data';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -20,9 +16,9 @@
 			total: data.summaries.liquid.totalValue + data.summaries.nonLiquid.totalValue + data.summaries.investment.totalValue
 		},
 		liabilities: {
-			total: mockLiabilities.reduce((sum, liability) => sum + liability.balance, 0)
+			total: data.summaries.debt.totalDebt
 		},
-		netWorth: (data.summaries.liquid.totalValue + data.summaries.nonLiquid.totalValue + data.summaries.investment.totalValue) - mockLiabilities.reduce((sum, liability) => sum + liability.balance, 0)
+		netWorth: (data.summaries.liquid.totalValue + data.summaries.nonLiquid.totalValue + data.summaries.investment.totalValue) - data.summaries.debt.totalDebt
 	});
 
 	// Format currency for display
@@ -116,10 +112,22 @@
 			<CardContent class="p-6">
 				<p class="text-sm font-medium text-amber-700 dark:text-amber-300 mb-1">Debt Ratio</p>
 				<p class="text-2xl font-bold text-amber-800 dark:text-amber-200">
-					{((netWorthData.liabilities.total / netWorthData.assets.total) * 100).toFixed(1)}%
+					{#if netWorthData.assets.total === 0 && netWorthData.liabilities.total === 0}
+						0.0%
+					{:else if netWorthData.assets.total === 0 && netWorthData.liabilities.total > 0}
+						∞
+					{:else if netWorthData.assets.total > 0}
+						{Math.min(((netWorthData.liabilities.total / netWorthData.assets.total) * 100), 999.9).toFixed(1)}%
+					{:else}
+						0.0%
+					{/if}
 				</p>
 				<p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
-					of assets
+					{#if netWorthData.assets.total === 0 && netWorthData.liabilities.total > 0}
+						No assets
+					{:else}
+						of assets
+					{/if}
 				</p>
 			</CardContent>
 		</Card>
@@ -291,34 +299,38 @@
 					</div>
 				</CardHeader>
 				<CardContent>
-					<div class="space-y-3">
-						{#each mockLiabilities as liability}
-							<div class="flex justify-between items-center py-3 border-b last:border-0">
-								<div class="flex items-center gap-3">
-									<div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs">
-										{liabilityTypes[liability.type]?.icon || '💸'}
+					{#if data.debts.length === 0}
+						<p class="text-sm text-muted-foreground text-center py-4">No outstanding debts</p>
+					{:else}
+						<div class="space-y-3">
+							{#each data.debts as debt}
+								<div class="flex justify-between items-center py-3 border-b last:border-0">
+									<div class="flex items-center gap-3">
+										<div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs">
+											{debt.debtType?.icon || '💸'}
+										</div>
+										<div>
+											<p class="font-medium">{debt.name}</p>
+											{#if debt.interestRate}
+												<p class="text-xs text-muted-foreground">
+													{debt.interestRate}% APR
+													{#if debt.monthlyPayment}
+														• {displayCurrency(parseFloat(debt.monthlyPayment))}/mo
+													{/if}
+												</p>
+											{/if}
+										</div>
 									</div>
-									<div>
-										<p class="font-medium">{liability.name}</p>
-										{#if liability.interestRate}
-											<p class="text-xs text-muted-foreground">
-												{liability.interestRate}% APR
-												{#if liability.monthlyPayment}
-													• {displayCurrency(liability.monthlyPayment)}/mo
-												{/if}
-											</p>
-										{/if}
+									<div class="text-right">
+										<p class="font-semibold text-red-600">{displayCurrency(parseFloat(debt.balance))}</p>
+										<p class="text-xs text-muted-foreground">
+											{formatPercentage(parseFloat(debt.balance), netWorthData.liabilities.total)}
+										</p>
 									</div>
 								</div>
-								<div class="text-right">
-									<p class="font-semibold text-red-600">{displayCurrency(liability.balance)}</p>
-									<p class="text-xs text-muted-foreground">
-										{formatPercentage(liability.balance, netWorthData.liabilities.total)}
-									</p>
-								</div>
-							</div>
-						{/each}
-					</div>
+							{/each}
+						</div>
+					{/if}
 				</CardContent>
 			</Card>
 		</div>

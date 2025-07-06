@@ -11,20 +11,20 @@ function generateDebtTypeId(): string {
 }
 
 // Default debt types
-export const defaultDebtTypes = [
-	{ label: 'Credit Card', icon: '💳' },
-	{ label: 'Personal Loan', icon: '💰' },
+const defaultDebtTypes = [
 	{ label: 'Mortgage', icon: '🏠' },
 	{ label: 'Auto Loan', icon: '🚗' },
+	{ label: 'Credit Card', icon: '💳' },
+	{ label: 'Personal Loan', icon: '💸' },
 	{ label: 'Student Loan', icon: '🎓' },
-	{ label: 'Business Loan', icon: '🏢' },
+	{ label: 'Business Loan', icon: '💼' },
 	{ label: 'Medical Debt', icon: '🏥' },
 	{ label: 'Other', icon: '📄' }
 ];
 
-// Create default debt types for a new user
-export async function createDefaultDebtTypes(userId: string) {
-	const debtTypesToCreate = defaultDebtTypes.map(type => ({
+// Initialize default debt types for a user
+export async function initializeUserDebtTypes(userId: string) {
+	const debtTypes = defaultDebtTypes.map(type => ({
 		id: generateDebtTypeId(),
 		userId,
 		label: type.label,
@@ -32,12 +32,8 @@ export async function createDefaultDebtTypes(userId: string) {
 		isSystem: true
 	}));
 	
-	try {
-		await db.insert(table.debtTypes).values(debtTypesToCreate);
-	} catch (error) {
-		console.error('Failed to create default debt types:', error);
-		// Non-critical error, user can still add custom types
-	}
+	await db.insert(table.debtTypes).values(debtTypes);
+	return debtTypes;
 }
 
 // Get all debt types for a user
@@ -45,23 +41,29 @@ export async function getUserDebtTypes(userId: string) {
 	const debtTypes = await db
 		.select()
 		.from(table.debtTypes)
-		.where(eq(table.debtTypes.userId, userId))
-		.orderBy(table.debtTypes.createdAt);
+		.where(eq(table.debtTypes.userId, userId));
+	
+	// Initialize default types if user has none
+	if (debtTypes.length === 0) {
+		return await initializeUserDebtTypes(userId);
+	}
 	
 	return debtTypes;
 }
 
-// Create a new debt type
-export async function createDebtType(userId: string, data: { label: string; icon: string }) {
-	const debtTypeId = generateDebtTypeId();
+// Create a custom debt type
+export async function createDebtType(userId: string, data: {
+	label: string;
+	icon: string;
+}) {
+	const id = generateDebtTypeId();
 	
 	const [debtType] = await db
 		.insert(table.debtTypes)
 		.values({
-			id: debtTypeId,
+			id,
 			userId,
-			label: data.label,
-			icon: data.icon,
+			...data,
 			isSystem: false
 		})
 		.returning();
@@ -69,24 +71,26 @@ export async function createDebtType(userId: string, data: { label: string; icon
 	return debtType;
 }
 
-// Update a debt type
+// Update a debt type (only non-system types)
 export async function updateDebtType(
 	userId: string,
 	debtTypeId: string,
-	data: { label?: string; icon?: string }
+	data: {
+		label?: string;
+		icon?: string;
+	}
 ) {
-	const updates: Partial<table.DebtType> = {
-		...data,
-		updatedAt: new Date()
-	};
-	
 	const [updated] = await db
 		.update(table.debtTypes)
-		.set(updates)
+		.set({
+			...data,
+			updatedAt: new Date()
+		})
 		.where(
 			and(
 				eq(table.debtTypes.id, debtTypeId),
-				eq(table.debtTypes.userId, userId)
+				eq(table.debtTypes.userId, userId),
+				eq(table.debtTypes.isSystem, false)
 			)
 		)
 		.returning();
@@ -94,15 +98,31 @@ export async function updateDebtType(
 	return updated;
 }
 
-// Delete a debt type
+// Delete a debt type (only non-system types)
 export async function deleteDebtType(userId: string, debtTypeId: string) {
+	// Check if any debts are using this type
+	const [debtUsingType] = await db
+		.select()
+		.from(table.debts)
+		.where(
+			and(
+				eq(table.debts.userId, userId),
+				eq(table.debts.debtTypeId, debtTypeId)
+			)
+		)
+		.limit(1);
+	
+	if (debtUsingType) {
+		throw new Error('Cannot delete debt type that is in use');
+	}
+	
 	const [deleted] = await db
 		.delete(table.debtTypes)
 		.where(
 			and(
 				eq(table.debtTypes.id, debtTypeId),
 				eq(table.debtTypes.userId, userId),
-				eq(table.debtTypes.isSystem, false) // Can't delete system types
+				eq(table.debtTypes.isSystem, false)
 			)
 		)
 		.returning();

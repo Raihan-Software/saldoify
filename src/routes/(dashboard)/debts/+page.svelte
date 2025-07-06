@@ -8,27 +8,51 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import PageHeader from '$lib/components/page-header.svelte';
-	import { mockLiabilities, liabilityTypes, type Liability } from '$lib/modules/networth/networth-data';
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import type { PageData } from './$types';
+	import type { Debt, DebtType } from '$lib/server/db/schema';
 
-	let debts = $state([...mockLiabilities]);
+	let { data }: { data: PageData } = $props();
+
 	let showAddModal = $state(false);
+	let showEditModal = $state(false);
+	let showDeleteModal = $state(false);
+	let isSubmitting = $state(false);
+	let editingDebt = $state<Debt | null>(null);
+	let deletingDebt = $state<Debt | null>(null);
 	
 	// Calculate totals
-	let totalDebt = $derived(debts.reduce((sum, debt) => sum + debt.balance, 0));
-	let totalMonthlyPayment = $derived(debts.reduce((sum, debt) => sum + (debt.monthlyPayment || 0), 0));
-	let totalOriginal = $derived(debts.reduce((sum, debt) => sum + (debt.originalAmount || debt.balance), 0));
+	let totalDebt = $derived(data.debts.reduce((sum, debt) => sum + parseFloat(debt.balance), 0));
+	let totalMonthlyPayment = $derived(data.debts.reduce((sum, debt) => sum + (parseFloat(debt.monthlyPayment || '0') || 0), 0));
+	let totalOriginal = $derived(data.debts.reduce((sum, debt) => sum + (parseFloat(debt.originalAmount || debt.balance) || 0), 0));
 	let totalPaidOff = $derived(totalOriginal - totalDebt);
 	let paidOffPercentage = $derived(totalOriginal > 0 ? (totalPaidOff / totalOriginal) * 100 : 0);
+	let averageInterestRate = $derived(
+		data.debts.length > 0
+			? data.debts.reduce((sum, d) => sum + (parseFloat(d.interestRate || '0') || 0), 0) / 
+			  data.debts.filter(d => d.interestRate).length || 0
+			: 0
+	);
 	
 	// Form state
 	let formData = $state({
 		name: '',
-		type: 'personal-loan' as Liability['type'],
+		debtTypeId: '',
 		balance: '',
 		originalAmount: '',
 		interestRate: '',
 		monthlyPayment: '',
+		startDate: '',
+		dueDate: '',
 		notes: ''
+	});
+	
+	// Set default debt type when component mounts
+	$effect(() => {
+		if (data.debtTypes.length > 0 && !formData.debtTypeId) {
+			formData.debtTypeId = data.debtTypes[0].id;
+		}
 	});
 
 	function formatCurrency(amount: number): string {
@@ -45,43 +69,53 @@
 		return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 	}
 	
-	function getDebtProgress(debt: Liability): number {
+	function getDebtProgress(debt: Debt): number {
 		if (!debt.originalAmount) return 0;
-		return ((debt.originalAmount - debt.balance) / debt.originalAmount) * 100;
+		const original = parseFloat(debt.originalAmount);
+		const balance = parseFloat(debt.balance);
+		return ((original - balance) / original) * 100;
 	}
 	
-	function handleAddDebt() {
-		if (!formData.name || !formData.balance) return;
-		
-		const newDebt: Liability = {
-			id: Date.now().toString(),
-			name: formData.name,
-			type: formData.type,
-			balance: parseFloat(formData.balance),
-			originalAmount: formData.originalAmount ? parseFloat(formData.originalAmount) : undefined,
-			interestRate: formData.interestRate ? parseFloat(formData.interestRate) : undefined,
-			monthlyPayment: formData.monthlyPayment ? parseFloat(formData.monthlyPayment) : undefined,
-			notes: formData.notes || undefined
-		};
-		
-		debts = [...debts, newDebt];
-		
-		// Reset form
+	function resetForm() {
 		formData = {
 			name: '',
-			type: 'personal-loan',
+			debtTypeId: data.debtTypes.length > 0 ? data.debtTypes[0].id : '',
 			balance: '',
 			originalAmount: '',
 			interestRate: '',
 			monthlyPayment: '',
+			startDate: '',
+			dueDate: '',
 			notes: ''
 		};
-		
-		showAddModal = false;
 	}
 	
-	function deleteDebt(id: string) {
-		debts = debts.filter(debt => debt.id !== id);
+	function formatDateForInput(date: Date | string | null): string {
+		if (!date) return '';
+		const dateObj = typeof date === 'string' ? new Date(date) : date;
+		// Format as YYYY-MM-DD for date input
+		return dateObj.toISOString().split('T')[0];
+	}
+	
+	function openEditModal(debt: Debt) {
+		editingDebt = debt;
+		formData = {
+			name: debt.name,
+			debtTypeId: debt.debtTypeId,
+			balance: Math.floor(parseFloat(debt.balance)).toString(), // Parse as float and remove decimals
+			originalAmount: debt.originalAmount ? Math.floor(parseFloat(debt.originalAmount)).toString() : '',
+			interestRate: debt.interestRate || '',
+			monthlyPayment: debt.monthlyPayment ? Math.floor(parseFloat(debt.monthlyPayment)).toString() : '',
+			startDate: formatDateForInput(debt.startDate),
+			dueDate: formatDateForInput(debt.dueDate),
+			notes: debt.notes || ''
+		};
+		showEditModal = true;
+	}
+	
+	function openDeleteModal(debt: Debt) {
+		deletingDebt = debt;
+		showDeleteModal = true;
 	}
 </script>
 
@@ -134,7 +168,7 @@
 				<div class="flex items-center justify-between">
 					<div>
 						<p class="text-sm font-medium text-purple-700 dark:text-purple-300 mb-1">Active Debts</p>
-						<p class="text-2xl font-bold text-purple-800 dark:text-purple-200">{debts.length}</p>
+						<p class="text-2xl font-bold text-purple-800 dark:text-purple-200">{data.debts.length}</p>
 					</div>
 					<FileText class="h-8 w-8 text-purple-500 opacity-50" />
 				</div>
@@ -147,7 +181,7 @@
 					<div>
 						<p class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">Avg Interest Rate</p>
 						<p class="text-2xl font-bold text-blue-800 dark:text-blue-200">
-							{(debts.reduce((sum, d) => sum + (d.interestRate || 0), 0) / debts.filter(d => d.interestRate).length || 0).toFixed(1)}%
+							{averageInterestRate.toFixed(1)}%
 						</p>
 					</div>
 					<TrendingDown class="h-8 w-8 text-blue-500 opacity-50" />
@@ -177,7 +211,7 @@
 			</CardDescription>
 		</CardHeader>
 		<CardContent>
-			{#if debts.length > 0}
+			{#if data.debts.length > 0}
 				<Table>
 					<TableHeader>
 						<TableRow>
@@ -192,7 +226,7 @@
 						</TableRow>
 					</TableHeader>
 					<TableBody>
-						{#each debts as debt}
+						{#each data.debts as debt}
 							<TableRow>
 								<TableCell class="font-medium">
 									{debt.name}
@@ -202,20 +236,20 @@
 								</TableCell>
 								<TableCell>
 									<Badge variant="secondary">
-										{liabilityTypes[debt.type]?.icon} {liabilityTypes[debt.type]?.label}
+										{debt.debtType?.icon} {debt.debtType?.label}
 									</Badge>
 								</TableCell>
 								<TableCell class="text-right font-semibold text-red-600">
-									{formatCurrency(debt.balance)}
+									{formatCurrency(parseFloat(debt.balance))}
 								</TableCell>
 								<TableCell class="text-right">
-									{debt.originalAmount ? formatCurrency(debt.originalAmount) : '-'}
+									{debt.originalAmount ? formatCurrency(parseFloat(debt.originalAmount)) : '-'}
 								</TableCell>
 								<TableCell class="text-center">
 									{debt.interestRate ? `${debt.interestRate}%` : '-'}
 								</TableCell>
 								<TableCell class="text-right">
-									{debt.monthlyPayment ? formatCurrency(debt.monthlyPayment) : '-'}
+									{debt.monthlyPayment ? formatCurrency(parseFloat(debt.monthlyPayment)) : '-'}
 								</TableCell>
 								<TableCell>
 									{#if debt.originalAmount}
@@ -236,10 +270,10 @@
 								</TableCell>
 								<TableCell class="text-right">
 									<div class="flex justify-end gap-2">
-										<Button variant="ghost" size="icon">
+										<Button variant="ghost" size="icon" onclick={() => openEditModal(debt)}>
 											<Edit class="h-4 w-4" />
 										</Button>
-										<Button variant="ghost" size="icon" onclick={() => deleteDebt(debt.id)}>
+										<Button variant="ghost" size="icon" onclick={() => openDeleteModal(debt)}>
 											<Trash2 class="h-4 w-4" />
 										</Button>
 									</div>
@@ -273,11 +307,26 @@
 			</Dialog.Description>
 		</Dialog.Header>
 		
-		<form onsubmit={(e) => { e.preventDefault(); handleAddDebt(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/create"
+			use:enhance={() => {
+				isSubmitting = true;
+				return async ({ result }) => {
+					isSubmitting = false;
+					if (result.type === 'success') {
+						showAddModal = false;
+						resetForm();
+						await invalidateAll();
+					}
+				};
+			}}
+			class="space-y-4">
 			<div class="space-y-2">
 				<Label for="name">Debt Name *</Label>
 				<Input
 					id="name"
+					name="name"
 					placeholder="e.g., Home Mortgage - BCA"
 					bind:value={formData.name}
 					required
@@ -285,14 +334,16 @@
 			</div>
 			
 			<div class="space-y-2">
-				<Label for="type">Debt Type *</Label>
+				<Label for="debtTypeId">Debt Type *</Label>
 				<select
-					id="type"
-					bind:value={formData.type}
+					id="debtTypeId"
+					name="debtTypeId"
+					bind:value={formData.debtTypeId}
 					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+					required
 				>
-					{#each Object.entries(liabilityTypes) as [value, { label, icon }]}
-						<option {value}>{icon} {label}</option>
+					{#each data.debtTypes as debtType}
+						<option value={debtType.id}>{debtType.icon} {debtType.label}</option>
 					{/each}
 				</select>
 			</div>
@@ -302,18 +353,18 @@
 					<Label for="balance">Current Balance *</Label>
 					<div class="relative">
 						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+						<input type="hidden" name="balance" value={formData.balance} />
 						<Input
 							id="balance"
 							type="text"
 							placeholder="0"
 							class="pl-10"
-							bind:value={formData.balance}
+							value={formatNumberInput(formData.balance)}
 							oninput={(e) => {
 								const target = e.currentTarget;
 								const value = target.value;
-								const formatted = formatNumberInput(value);
 								formData.balance = value.replace(/\D/g, '');
-								target.value = formatted;
+								target.value = formatNumberInput(formData.balance);
 							}}
 							required
 						/>
@@ -324,18 +375,18 @@
 					<Label for="originalAmount">Original Amount</Label>
 					<div class="relative">
 						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+						<input type="hidden" name="originalAmount" value={formData.originalAmount} />
 						<Input
 							id="originalAmount"
 							type="text"
 							placeholder="0"
 							class="pl-10"
-							bind:value={formData.originalAmount}
+							value={formatNumberInput(formData.originalAmount)}
 							oninput={(e) => {
 								const target = e.currentTarget;
 								const value = target.value;
-								const formatted = formatNumberInput(value);
 								formData.originalAmount = value.replace(/\D/g, '');
-								target.value = formatted;
+								target.value = formatNumberInput(formData.originalAmount);
 							}}
 						/>
 					</div>
@@ -347,6 +398,7 @@
 					<Label for="interestRate">Interest Rate (% APR)</Label>
 					<Input
 						id="interestRate"
+						name="interestRate"
 						type="number"
 						step="0.1"
 						placeholder="e.g., 7.5"
@@ -358,21 +410,43 @@
 					<Label for="monthlyPayment">Monthly Payment</Label>
 					<div class="relative">
 						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+						<input type="hidden" name="monthlyPayment" value={formData.monthlyPayment} />
 						<Input
 							id="monthlyPayment"
 							type="text"
 							placeholder="0"
 							class="pl-10"
-							bind:value={formData.monthlyPayment}
+							value={formatNumberInput(formData.monthlyPayment)}
 							oninput={(e) => {
 								const target = e.currentTarget;
 								const value = target.value;
-								const formatted = formatNumberInput(value);
 								formData.monthlyPayment = value.replace(/\D/g, '');
-								target.value = formatted;
+								target.value = formatNumberInput(formData.monthlyPayment);
 							}}
 						/>
 					</div>
+				</div>
+			</div>
+			
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="startDate">Start Date</Label>
+					<Input
+						id="startDate"
+						name="startDate"
+						type="date"
+						bind:value={formData.startDate}
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="dueDate">Due Date</Label>
+					<Input
+						id="dueDate"
+						name="dueDate"
+						type="date"
+						bind:value={formData.dueDate}
+					/>
 				</div>
 			</div>
 			
@@ -380,20 +454,258 @@
 				<Label for="notes">Notes</Label>
 				<textarea
 					id="notes"
+					name="notes"
 					placeholder="Additional details..."
 					bind:value={formData.notes}
 					class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-				/>
+				></textarea>
 			</div>
 			
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => showAddModal = false}>
 					Cancel
 				</Button>
-				<Button type="submit">
-					Add Debt
+				<Button type="submit" disabled={isSubmitting}>
+					{isSubmitting ? 'Adding...' : 'Add Debt'}
 				</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Edit Debt Modal -->
+<Dialog.Root bind:open={showEditModal}>
+	<Dialog.Content class="sm:max-w-[500px]">
+		<Dialog.Header>
+			<Dialog.Title>Edit Debt</Dialog.Title>
+			<Dialog.Description>
+				Update your debt information.
+			</Dialog.Description>
+		</Dialog.Header>
+		
+		<form 
+			method="POST" 
+			action="?/update"
+			use:enhance={() => {
+				isSubmitting = true;
+				return async ({ result }) => {
+					isSubmitting = false;
+					if (result.type === 'success') {
+						showEditModal = false;
+						editingDebt = null;
+						resetForm();
+						await invalidateAll();
+					}
+				};
+			}}
+			class="space-y-4">
+			<input type="hidden" name="id" value={editingDebt?.id} />
+			
+			<div class="space-y-2">
+				<Label for="edit-name">Debt Name *</Label>
+				<Input
+					id="edit-name"
+					name="name"
+					placeholder="e.g., Home Mortgage - BCA"
+					bind:value={formData.name}
+					required
+				/>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="edit-debtTypeId">Debt Type *</Label>
+				<select
+					id="edit-debtTypeId"
+					name="debtTypeId"
+					bind:value={formData.debtTypeId}
+					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+					required
+				>
+					{#each data.debtTypes as debtType}
+						<option value={debtType.id}>{debtType.icon} {debtType.label}</option>
+					{/each}
+				</select>
+			</div>
+			
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-balance">Current Balance *</Label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+						<input type="hidden" name="balance" value={formData.balance} />
+						<Input
+							id="edit-balance"
+							type="text"
+							placeholder="0"
+							class="pl-10"
+							value={formatNumberInput(formData.balance)}
+							oninput={(e) => {
+								const target = e.currentTarget;
+								const value = target.value;
+								formData.balance = value.replace(/\D/g, '');
+								target.value = formatNumberInput(formData.balance);
+							}}
+							required
+						/>
+					</div>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-originalAmount">Original Amount</Label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+						<input type="hidden" name="originalAmount" value={formData.originalAmount} />
+						<Input
+							id="edit-originalAmount"
+							type="text"
+							placeholder="0"
+							class="pl-10"
+							value={formatNumberInput(formData.originalAmount)}
+							oninput={(e) => {
+								const target = e.currentTarget;
+								const value = target.value;
+								formData.originalAmount = value.replace(/\D/g, '');
+								target.value = formatNumberInput(formData.originalAmount);
+							}}
+						/>
+					</div>
+				</div>
+			</div>
+			
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-interestRate">Interest Rate (% APR)</Label>
+					<Input
+						id="edit-interestRate"
+						name="interestRate"
+						type="number"
+						step="0.1"
+						placeholder="e.g., 7.5"
+						bind:value={formData.interestRate}
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-monthlyPayment">Monthly Payment</Label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+						<input type="hidden" name="monthlyPayment" value={formData.monthlyPayment} />
+						<Input
+							id="edit-monthlyPayment"
+							type="text"
+							placeholder="0"
+							class="pl-10"
+							value={formatNumberInput(formData.monthlyPayment)}
+							oninput={(e) => {
+								const target = e.currentTarget;
+								const value = target.value;
+								formData.monthlyPayment = value.replace(/\D/g, '');
+								target.value = formatNumberInput(formData.monthlyPayment);
+							}}
+						/>
+					</div>
+				</div>
+			</div>
+			
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-startDate">Start Date</Label>
+					<Input
+						id="edit-startDate"
+						name="startDate"
+						type="date"
+						bind:value={formData.startDate}
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-dueDate">Due Date</Label>
+					<Input
+						id="edit-dueDate"
+						name="dueDate"
+						type="date"
+						bind:value={formData.dueDate}
+					/>
+				</div>
+			</div>
+			
+			<div class="space-y-2">
+				<Label for="edit-notes">Notes</Label>
+				<textarea
+					id="edit-notes"
+					name="notes"
+					placeholder="Additional details..."
+					bind:value={formData.notes}
+					class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+				></textarea>
+			</div>
+			
+			<Dialog.Footer>
+				<Button type="button" variant="outline" onclick={() => {
+					showEditModal = false;
+					editingDebt = null;
+					resetForm();
+				}}>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={isSubmitting}>
+					{isSubmitting ? 'Updating...' : 'Update Debt'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Delete Confirmation Modal -->
+<Dialog.Root bind:open={showDeleteModal}>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title>Delete Debt</Dialog.Title>
+			<Dialog.Description>
+				Are you sure you want to delete this debt? This action cannot be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+		
+		{#if deletingDebt}
+			<div class="my-4 p-4 bg-gray-50 rounded-lg">
+				<p class="font-medium">{deletingDebt.name}</p>
+				<p class="text-sm text-muted-foreground mt-1">
+					Balance: {formatCurrency(parseFloat(deletingDebt.balance))}
+				</p>
+			</div>
+		{/if}
+		
+		<Dialog.Footer>
+			<Button variant="outline" onclick={() => {
+				showDeleteModal = false;
+				deletingDebt = null;
+			}}>
+				Cancel
+			</Button>
+			<form 
+				method="POST" 
+				action="?/delete"
+				use:enhance={() => {
+					isSubmitting = true;
+					return async ({ result }) => {
+						isSubmitting = false;
+						if (result.type === 'success') {
+							showDeleteModal = false;
+							deletingDebt = null;
+							await invalidateAll();
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="id" value={deletingDebt?.id} />
+				<Button 
+					type="submit" 
+					variant="destructive"
+					disabled={isSubmitting}
+				>
+					{isSubmitting ? 'Deleting...' : 'Delete Debt'}
+				</Button>
+			</form>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
