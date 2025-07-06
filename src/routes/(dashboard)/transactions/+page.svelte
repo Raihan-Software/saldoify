@@ -17,7 +17,10 @@
 		transactionCategories,
 		type Transaction 
 	} from '$lib/modules/transactions/transactions-data';
-	import { mockLiquidAssets } from '$lib/modules/assets/liquid/liquid-assets-data';
+	import type { PageData } from './$types';
+	
+	let { data }: { data: PageData } = $props();
+	console.log(data);
 
 	let transactions = $state(mockTransactions);
 	let showAddModal = $state(false);
@@ -57,13 +60,13 @@
 		notes: ''
 	});
 	
-	// Get available accounts for transfers
-	const availableAccounts = mockLiquidAssets.map(asset => ({
+	// Get available accounts from database
+	const availableAccounts = $derived(data.liquidAssets.map(asset => ({
 		id: asset.id,
 		name: asset.name,
-		institution: asset.institution,
-		balance: asset.balance
-	}));
+		institution: asset.bankName,
+		balance: asset.currentValue
+	})));
 	
 	// Update available types when category changes
 	let availableTypes = $derived(
@@ -126,7 +129,7 @@
 			amount: parseFloat(formData.amount),
 			account: formData.category === 'transfer' 
 				? `${getAccountName(formData.fromAccount)} → ${getAccountName(formData.toAccount)}`
-				: formData.account || undefined,
+				: getAccountName(formData.account) || undefined,
 			notes: formData.notes || undefined
 		};
 		
@@ -368,11 +371,22 @@
 				{#if formData.category !== 'transfer'}
 					<div class="space-y-2">
 						<Label for="account">Account</Label>
-						<Input
+						<select
 							id="account"
-							placeholder="e.g., BCA Debit"
 							bind:value={formData.account}
-						/>
+							class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							required={formData.category !== 'transfer'}
+						>
+							<option value="">Select account</option>
+							{#each availableAccounts as account}
+								<option value={account.id}>
+									{account.name}
+									{#if account.institution}
+										({account.institution})
+									{/if}
+								</option>
+							{/each}
+						</select>
 					</div>
 				{/if}
 			</div>
