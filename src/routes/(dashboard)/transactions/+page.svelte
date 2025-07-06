@@ -3,8 +3,9 @@
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Plus, TrendingUp, TrendingDown, Activity, Calendar, Wallet, ArrowRightLeft, FileText, Hash, CreditCard } from '@lucide/svelte';
+	import { Plus, TrendingUp, TrendingDown, Activity, Calendar, Wallet, ArrowRightLeft, FileText, Hash, CreditCard, MoreVertical, Edit, Trash2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import PageHeader from '$lib/components/page-header.svelte';
@@ -15,7 +16,11 @@
 	let { data }: { data: PageData } = $props();
 
 	let showAddModal = $state(false);
+	let showEditModal = $state(false);
+	let showDeleteModal = $state(false);
 	let isSubmitting = $state(false);
+	let editingTransaction = $state<any>(null);
+	let deletingTransaction = $state<any>(null);
 	
 	// Group transactions by date
 	let groupedTransactions = $derived.by(() => {
@@ -262,6 +267,7 @@
 								<TableHead>Category</TableHead>
 								<TableHead>Account</TableHead>
 								<TableHead class="text-right">Amount</TableHead>
+								<TableHead class="w-[50px]"></TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -299,6 +305,44 @@
 										<span class="font-medium {transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}">
 											{transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
 										</span>
+									</TableCell>
+									<TableCell>
+										<DropdownMenu.Root>
+											<DropdownMenu.Trigger>
+												<Button variant="ghost" class="h-8 w-8 p-0">
+													<span class="sr-only">Open menu</span>
+													<MoreVertical class="h-4 w-4" />
+												</Button>
+											</DropdownMenu.Trigger>
+											<DropdownMenu.Content align="end">
+												<DropdownMenu.Item onclick={() => {
+													editingTransaction = transaction;
+													formData = {
+														date: new Date(transaction.transactionDate).toISOString().slice(0, 16),
+														description: transaction.description,
+														category: transaction.type as 'income' | 'expense' | 'transfer',
+														type: transaction.category?.id || '',
+														amount: transaction.amount,
+														account: transaction.account?.id || '',
+														fromAccount: '',
+														toAccount: '',
+														notes: transaction.notes || ''
+													};
+													showEditModal = true;
+												}}>
+													<Edit class="mr-2 h-4 w-4" />
+													<span>Edit</span>
+												</DropdownMenu.Item>
+												<DropdownMenu.Separator />
+												<DropdownMenu.Item class="text-red-600" onclick={() => {
+													deletingTransaction = transaction;
+													showDeleteModal = true;
+												}}>
+													<Trash2 class="mr-2 h-4 w-4" />
+													<span>Delete</span>
+												</DropdownMenu.Item>
+											</DropdownMenu.Content>
+										</DropdownMenu.Root>
 									</TableCell>
 								</TableRow>
 							{/each}
@@ -582,5 +626,266 @@
 				</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Edit Transaction Modal -->
+<Dialog.Root bind:open={showEditModal}>
+	<Dialog.Content class="sm:max-w-[600px]">
+		<Dialog.Header>
+			<Dialog.Title>Edit Transaction</Dialog.Title>
+			<Dialog.Description>
+				Update your transaction details
+			</Dialog.Description>
+		</Dialog.Header>
+		
+		<form 
+			method="POST" 
+			action="?/update"
+			use:enhance={() => {
+				isSubmitting = true;
+				return async ({ result }) => {
+					isSubmitting = false;
+					if (result.type === 'success') {
+						showEditModal = false;
+						editingTransaction = null;
+						resetForm();
+						await invalidateAll();
+					}
+				};
+			}}
+			class="space-y-6 mt-6"
+		>
+			<input type="hidden" name="id" value={editingTransaction?.id} />
+			
+			<!-- Category Selection - Visual Cards -->
+			<div class="space-y-2">
+				<Label class="text-sm font-medium text-gray-700">Transaction Type</Label>
+				<input type="hidden" name="type" value={formData.category} />
+				<div class="grid grid-cols-2 gap-3">
+					{#each [['income', '💰', 'Income'], ['expense', '💸', 'Expense']] as [value, icon, label]}
+						<button
+							type="button"
+							onclick={() => formData.category = value}
+							class="relative p-4 rounded-lg border-2 transition-all duration-200 {
+								formData.category === value 
+									? value === 'income' ? 'border-green-500 bg-green-50' 
+									: 'border-red-500 bg-red-50'
+									: 'border-gray-200 bg-gray-50 hover:border-gray-300'
+							}"
+						>
+							<div class="text-2xl mb-1">{icon}</div>
+							<div class="text-sm font-medium {
+								formData.category === value 
+									? value === 'income' ? 'text-green-700' 
+									: 'text-red-700'
+									: 'text-gray-700'
+							}">{label}</div>
+							{#if formData.category === value}
+								<div class="absolute top-2 right-2 w-2 h-2 rounded-full {
+									value === 'income' ? 'bg-green-500' 
+									: 'bg-red-500'
+								}"></div>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			</div>
+			
+			<!-- Date and Type Row -->
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-date" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Calendar class="w-4 h-4" />
+						Date & Time
+					</Label>
+					<Input
+						id="edit-date"
+						name="transactionDate"
+						type="datetime-local"
+						bind:value={formData.date}
+						class="h-11"
+						required
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-type" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Hash class="w-4 h-4" />
+						Category
+					</Label>
+					<select
+						id="edit-type"
+						name="categoryId"
+						bind:value={formData.type}
+						class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						required
+					>
+						<option value="">Select category</option>
+						{#each availableCategories as category}
+							<option value={category.id}>{category.label}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+			
+			<!-- Description -->
+			<div class="space-y-2">
+				<Label for="edit-description" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+					<FileText class="w-4 h-4" />
+					Description
+				</Label>
+				<Input
+					id="edit-description"
+					name="description"
+					placeholder={descriptionPlaceholder}
+					bind:value={formData.description}
+					class="h-11"
+					required
+				/>
+			</div>
+			
+			<!-- Amount and Account -->
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-amount" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Wallet class="w-4 h-4" />
+						Amount
+					</Label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base font-medium text-gray-500">Rp</span>
+						<Input
+							id="edit-amount"
+							name="amount"
+							type="text"
+							placeholder="0"
+							class="pl-12 h-11 text-lg font-medium"
+							bind:value={formData.amount}
+							oninput={(e) => {
+								const target = e.currentTarget;
+								const value = target.value;
+								const formatted = formatNumberInput(value);
+								formData.amount = value.replace(/\D/g, '');
+								target.value = formatted;
+							}}
+							required
+						/>
+					</div>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-account" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<CreditCard class="w-4 h-4" />
+						Account
+					</Label>
+					<select
+						id="edit-account"
+						name="assetId"
+						bind:value={formData.account}
+						class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						required
+					>
+						<option value="">Select account</option>
+						{#each availableAccounts as account}
+							<option value={account.id}>
+								{account.name}
+								{#if account.institution}
+									({account.institution})
+								{/if}
+							</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+			
+			<!-- Notes - Optional -->
+			<div class="space-y-2">
+				<Label for="edit-notes" class="text-sm font-medium text-gray-700">Notes (Optional)</Label>
+				<textarea
+					id="edit-notes"
+					name="notes"
+					placeholder="Add any additional details..."
+					bind:value={formData.notes}
+					class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+				></textarea>
+			</div>
+			
+			<Dialog.Footer class="flex gap-3 justify-end pt-4 border-t">
+				<Button type="button" variant="outline" onclick={() => {
+					showEditModal = false;
+					editingTransaction = null;
+					resetForm();
+				}}>
+					Cancel
+				</Button>
+				<Button 
+					type="submit" 
+					disabled={isSubmitting}
+					class="{
+						formData.category === 'income' ? 'bg-green-600 hover:bg-green-700' : 
+						'bg-red-600 hover:bg-red-700'
+					}"
+				>
+					{isSubmitting ? 'Updating...' : 'Update Transaction'}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Delete Confirmation Modal -->
+<Dialog.Root bind:open={showDeleteModal}>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title>Delete Transaction</Dialog.Title>
+			<Dialog.Description>
+				Are you sure you want to delete this transaction? This action cannot be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+		
+		{#if deletingTransaction}
+			<div class="my-4 p-4 bg-gray-50 rounded-lg">
+				<p class="font-medium">{deletingTransaction.description}</p>
+				<p class="text-sm text-muted-foreground mt-1">
+					<span class="{deletingTransaction.type === 'income' ? 'text-green-600' : 'text-red-600'}">
+						{deletingTransaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(deletingTransaction.amount))}
+					</span>
+					• {deletingTransaction.category?.label}
+				</p>
+			</div>
+		{/if}
+		
+		<Dialog.Footer class="flex gap-3 justify-end">
+			<Button variant="outline" onclick={() => {
+				showDeleteModal = false;
+				deletingTransaction = null;
+			}}>
+				Cancel
+			</Button>
+			<form 
+				method="POST" 
+				action="?/delete"
+				use:enhance={() => {
+					isSubmitting = true;
+					return async ({ result }) => {
+						isSubmitting = false;
+						if (result.type === 'success') {
+							showDeleteModal = false;
+							deletingTransaction = null;
+							await invalidateAll();
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="id" value={deletingTransaction?.id} />
+				<Button 
+					type="submit" 
+					variant="destructive"
+					disabled={isSubmitting}
+				>
+					{isSubmitting ? 'Deleting...' : 'Delete Transaction'}
+				</Button>
+			</form>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
