@@ -41,25 +41,25 @@ The Minimum Viable Product (MVP) focuses on delivering core financial tracking f
   - Checking accounts
   - E-wallets (GoPay, OVO, etc.)
   
-- [ ] **Investment Assets**
+- [x] **Investment Assets**
   - Stocks
   - Mutual funds
   - Bonds
   - Fixed deposits
   
-- [ ] **Non-Liquid Assets**
+- [x] **Non-Liquid Assets**
   - Real estate
   - Vehicles
   - Equipment
   - Other valuable items
 
 **Core Functionality**:
-- [ ] CRUD operations for all asset types
-- [ ] Asset categorization
-- [ ] Current value tracking
-- [ ] Purchase price and date recording
-- [ ] Notes and documentation
-- [ ] Multi-currency support (IDR primary)
+- [x] CRUD operations for all asset types
+- [x] Asset categorization
+- [x] Current value tracking
+- [x] Purchase price and date recording
+- [x] Notes and documentation
+- [x] Multi-currency support (IDR primary)
 
 **Database Schema**:
 ```sql
@@ -71,25 +71,20 @@ The Minimum Viable Product (MVP) focuses on delivering core financial tracking f
 **Purpose**: Record and categorize all financial transactions
 
 **Features**:
-- [ ] **Transaction Types**
+- [x] **Transaction Types**
   - Income transactions
   - Expense transactions
   - Transfer between accounts
   
-- [ ] **Transaction Details**
+- [x] **Transaction Details**
   - Amount and currency
   - Date and time
   - Category and subcategory
-  - Payment method
-  - Tags and notes
-  - Recurring transaction support
+  - notes
 
 **Core Functionality**:
-- [ ] Quick transaction entry
-- [ ] Bulk transaction import (CSV)
-- [ ] Transaction search and filtering
-- [ ] Category management
-- [ ] Monthly/yearly summaries
+- [x] Quick transaction entry
+- [x] Monthly summaries
 
 **Database Schema**:
 ```sql

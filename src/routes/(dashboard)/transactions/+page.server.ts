@@ -37,7 +37,7 @@ export const actions = {
 		}
 		
 		const data = await request.formData();
-		const type = data.get('type') as 'income' | 'expense';
+		const type = data.get('type') as 'income' | 'expense' | 'transfer';
 		const categoryId = data.get('categoryId') as string;
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
@@ -45,6 +45,55 @@ export const actions = {
 		const transactionDate = new Date(data.get('transactionDate') as string);
 		const notes = data.get('notes') as string;
 		
+		// Handle transfers separately
+		if (type === 'transfer') {
+			const fromAccountId = data.get('fromAccount') as string;
+			const toAccountId = data.get('toAccount') as string;
+			
+			if (!fromAccountId || !toAccountId) {
+				return fail(400, { message: 'Transfer requires both source and destination accounts' });
+			}
+			
+			if (fromAccountId === toAccountId) {
+				return fail(400, { message: 'Cannot transfer to the same account' });
+			}
+			
+			// Validate other required fields
+			if (!categoryId || !description || !amount || !transactionDate) {
+				return fail(400, { message: 'Missing required fields' });
+			}
+			
+			try {
+				// Create expense transaction from source account
+				await createTransaction(locals.user.id, {
+					type: 'expense',
+					categoryId,
+					description: `Transfer out: ${description}`,
+					amount,
+					assetId: fromAccountId,
+					transactionDate,
+					notes: notes ? `Transfer to destination account. ${notes}` : 'Transfer to destination account'
+				});
+				
+				// Create income transaction to destination account
+				await createTransaction(locals.user.id, {
+					type: 'income',
+					categoryId,
+					description: `Transfer in: ${description}`,
+					amount,
+					assetId: toAccountId,
+					transactionDate,
+					notes: notes ? `Transfer from source account. ${notes}` : 'Transfer from source account'
+				});
+				
+				return { success: true };
+			} catch (error) {
+				console.error('Failed to create transfer:', error);
+				return fail(500, { message: 'Failed to create transfer' });
+			}
+		}
+		
+		// Regular income/expense transaction
 		// Validate required fields
 		if (!type || !categoryId || !description || !amount || !assetId || !transactionDate) {
 			return fail(400, { message: 'Missing required fields' });
@@ -52,7 +101,7 @@ export const actions = {
 		
 		try {
 			await createTransaction(locals.user.id, {
-				type,
+				type: type as 'income' | 'expense',
 				categoryId,
 				description,
 				amount,

@@ -504,9 +504,8 @@
 							oninput={(e) => {
 								const target = e.currentTarget;
 								const value = target.value;
-								const formatted = formatNumberInput(value);
 								formData.amount = value.replace(/\D/g, '');
-								target.value = formatted;
+								target.value = value;
 							}}
 							required
 						/>
@@ -551,6 +550,7 @@
 							<Label for="fromAccount" class="text-sm font-medium text-gray-700">From Account</Label>
 							<select
 								id="fromAccount"
+								name="fromAccount"
 								bind:value={formData.fromAccount}
 								class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 								required={formData.category === 'transfer'}
@@ -568,6 +568,7 @@
 							<Label for="toAccount" class="text-sm font-medium text-gray-700">To Account</Label>
 							<select
 								id="toAccount"
+								name="toAccount"
 								bind:value={formData.toAccount}
 								class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 								required={formData.category === 'transfer'}
