@@ -8,79 +8,47 @@
 		TrendingUp, TrendingDown, Wallet, CreditCard, PiggyBank, 
 		ArrowUpRight, ArrowDownRight, MoreHorizontal, Eye, EyeOff, Receipt
 	} from '@lucide/svelte';
+	import type { PageData } from './$types';
 	
-	// Import data from other modules
-	import { calculateNetWorth } from '$lib/modules/networth/networth-data';
-	import { mockLiquidAssets } from '$lib/modules/assets/liquid/liquid-assets-data';
-	import { mockNonLiquidAssets } from '$lib/modules/assets/non-liquid/non-liquid-assets-data';
-	import { mockInvestmentAssets } from '$lib/modules/assets/investment/investment-assets-data';
-	import { mockLiabilities } from '$lib/modules/networth/networth-data';
-	import { mockTransactions, getCategoryIcon, getCategoryColor } from '$lib/modules/transactions/transactions-data';
+	let { data }: { data: PageData } = $props();
 	
-	// Calculate financial data
-	let netWorthData = $derived(calculateNetWorth());
+	// Use real data from server
+	let netWorthData = $derived(data.netWorthData);
 	let showBalances = $state(true);
+	let recentTransactions = $derived(data.recentTransactions);
+	let monthlyData = $derived(data.monthlyData);
+	let topCategories = $derived(data.topCategories);
+	let accountBalances = $derived(data.accountBalances);
 	
-	// Get recent transactions (last 10)
-	let recentTransactions = $derived(mockTransactions.slice(0, 10));
+	// Get transaction icon based on type
+	function getCategoryIcon(type: string): string {
+		if (type === 'income') return '💰';
+		if (type === 'expense') return '💸';
+		return '📊';
+	}
 	
-	// Calculate monthly income and expenses
-	let monthlyData = $derived(() => {
-		const now = new Date();
-		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-		
-		const monthTransactions = mockTransactions.filter(t => t.date >= startOfMonth);
-		
-		const income = monthTransactions
-			.filter(t => t.category === 'income')
-			.reduce((sum, t) => sum + t.amount, 0);
-			
-		const expenses = monthTransactions
-			.filter(t => t.category === 'expense')
-			.reduce((sum, t) => sum + t.amount, 0);
-			
-		const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
-		
-		return { income, expenses, savingsRate, net: income - expenses };
-	});
-	
-	// Top spending categories
-	let topCategories = $derived(() => {
-		const now = new Date();
-		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-		
-		const expenses = mockTransactions.filter(t => 
-			t.category === 'expense' && t.date >= startOfMonth
-		);
-		
-		const categoryTotals = expenses.reduce((acc, t) => {
-			acc[t.type] = (acc[t.type] || 0) + t.amount;
-			return acc;
-		}, {} as Record<string, number>);
-		
-		return Object.entries(categoryTotals)
-			.sort(([,a], [,b]) => b - a)
-			.slice(0, 5)
-			.map(([category, amount]) => ({ category, amount }));
-	});
-	
-	// Account balances
-	let accountBalances = $derived([
-		{ name: 'Liquid Assets', amount: netWorthData.assets.liquid, icon: '💵', color: 'text-green-600' },
-		{ name: 'Investments', amount: netWorthData.assets.investment, icon: '📈', color: 'text-blue-600' },
-		{ name: 'Properties', amount: netWorthData.assets.nonLiquid, icon: '🏠', color: 'text-purple-600' },
-		{ name: 'Total Debt', amount: -netWorthData.liabilities.total, icon: '💳', color: 'text-red-600' }
-	]);
+	// Get transaction color based on type
+	function getCategoryColor(type: string): string {
+		if (type === 'income') return 'text-green-600';
+		if (type === 'expense') return 'text-red-600';
+		return 'text-gray-600';
+	}
 	
 	function formatCurrency(amount: number): string {
-		if (!showBalances) return 'Rp ***';
+		if (!showBalances) return `${data.preferences?.currencySymbol || 'Rp'} ***`;
 		
-		return new Intl.NumberFormat('id-ID', {
+		const formatter = new Intl.NumberFormat('en-US', {
 			style: 'currency',
-			currency: 'IDR',
+			currency: data.preferences?.currencyCode || 'IDR',
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 0
-		}).format(amount);
+		});
+		
+		if (data.preferences?.currencyDisplay === 'code') {
+			return formatter.format(amount).replace(/[A-Z]{3}/, data.preferences.currencyCode);
+		}
+		
+		return formatter.format(amount);
 	}
 	
 	function formatCompactCurrency(amount: number): string {
@@ -145,7 +113,7 @@
 						</div>
 						<div class="text-right">
 							<p class="text-blue-100 text-sm">Monthly Savings</p>
-							<p class="text-2xl font-semibold">{formatCurrency(monthlyData().net)}</p>
+							<p class="text-2xl font-semibold">{formatCurrency(monthlyData.net)}</p>
 						</div>
 					</div>
 					
@@ -160,7 +128,7 @@
 						</div>
 						<div>
 							<p class="text-blue-100 text-sm">Savings Rate</p>
-							<p class="text-xl font-semibold">{monthlyData().savingsRate.toFixed(1)}%</p>
+							<p class="text-xl font-semibold">{monthlyData.savingsRate.toFixed(1)}%</p>
 						</div>
 					</div>
 				</div>
@@ -178,7 +146,7 @@
 					<TrendingUp class="h-4 w-4 text-green-600" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{formatCurrency(monthlyData().income)}</div>
+					<div class="text-2xl font-bold">{formatCurrency(monthlyData.income)}</div>
 					<p class="text-xs text-muted-foreground mt-1">
 						This month's earnings
 					</p>
@@ -191,7 +159,7 @@
 					<TrendingDown class="h-4 w-4 text-red-600" />
 				</CardHeader>
 				<CardContent>
-					<div class="text-2xl font-bold">{formatCurrency(monthlyData().expenses)}</div>
+					<div class="text-2xl font-bold">{formatCurrency(monthlyData.expenses)}</div>
 					<p class="text-xs text-muted-foreground mt-1">
 						This month's spending
 					</p>
@@ -243,18 +211,18 @@
 							<div class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
 								<div class="flex items-center gap-3">
 									<div class="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-lg">
-										{getCategoryIcon(transaction.category)}
+										{getCategoryIcon(transaction.type)}
 									</div>
 									<div>
 										<p class="font-medium">{transaction.description}</p>
-										<p class="text-sm text-muted-foreground">{formatDate(transaction.date)}</p>
+										<p class="text-sm text-muted-foreground">{formatDate(new Date(transaction.transactionDate))}</p>
 									</div>
 								</div>
 								<div class="text-right">
-									<p class="font-semibold {getCategoryColor(transaction.category)}">
-										{transaction.category === 'expense' ? '-' : '+'}{formatCurrency(transaction.amount)}
+									<p class="font-semibold {getCategoryColor(transaction.type)}">
+										{transaction.type === 'expense' ? '-' : '+'}{formatCurrency(parseFloat(transaction.amount))}
 									</p>
-									<p class="text-xs text-muted-foreground">{transaction.account}</p>
+									<p class="text-xs text-muted-foreground">{transaction.account?.name || '-'}</p>
 								</div>
 							</div>
 						{/each}
@@ -304,13 +272,13 @@
 					{#each topCategories as category}
 						<div class="space-y-2">
 							<div class="flex items-center justify-between">
-								<span class="text-sm font-medium capitalize">{category.category}</span>
+								<span class="text-sm font-medium">{category.label}</span>
 								<span class="text-sm text-muted-foreground">
 									{formatCompactCurrency(category.amount)}
 								</span>
 							</div>
 							<Progress 
-								value={(category.amount / monthlyData().expenses) * 100} 
+								value={(category.amount / monthlyData.expenses) * 100} 
 								class="h-2"
 							/>
 						</div>
