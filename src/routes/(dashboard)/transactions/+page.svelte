@@ -17,6 +17,7 @@
 		transactionCategories,
 		type Transaction 
 	} from '$lib/modules/transactions/transactions-data';
+	import { mockLiquidAssets } from '$lib/modules/assets/liquid/liquid-assets-data';
 
 	let transactions = $state(mockTransactions);
 	let showAddModal = $state(false);
@@ -51,12 +52,30 @@
 		type: 'food',
 		amount: '',
 		account: '',
+		fromAccount: '',
+		toAccount: '',
 		notes: ''
 	});
+	
+	// Get available accounts for transfers
+	const availableAccounts = mockLiquidAssets.map(asset => ({
+		id: asset.id,
+		name: asset.name,
+		institution: asset.institution,
+		balance: asset.balance
+	}));
 	
 	// Update available types when category changes
 	let availableTypes = $derived(
 		transactionCategories[formData.category].types
+	);
+	
+	// Dynamic placeholders based on category
+	let descriptionPlaceholder = $derived(
+		formData.category === 'income' ? 'e.g., Monthly salary' :
+		formData.category === 'expense' ? 'e.g., Lunch at restaurant' :
+		formData.category === 'transfer' ? 'e.g., Transfer to savings' :
+		'Enter description'
 	);
 	
 	// Reset type when category changes
@@ -86,6 +105,18 @@
 	function handleAddTransaction() {
 		if (!formData.description || !formData.amount) return;
 		
+		// Validate transfer specific fields
+		if (formData.category === 'transfer') {
+			if (!formData.fromAccount || !formData.toAccount) {
+				alert('Please select both source and destination accounts for the transfer');
+				return;
+			}
+			if (formData.fromAccount === formData.toAccount) {
+				alert('Source and destination accounts must be different');
+				return;
+			}
+		}
+		
 		const newTransaction: Transaction = {
 			id: Date.now().toString(),
 			date: new Date(formData.date),
@@ -93,7 +124,9 @@
 			category: formData.category,
 			type: formData.type,
 			amount: parseFloat(formData.amount),
-			account: formData.account || undefined,
+			account: formData.category === 'transfer' 
+				? `${getAccountName(formData.fromAccount)} → ${getAccountName(formData.toAccount)}`
+				: formData.account || undefined,
 			notes: formData.notes || undefined
 		};
 		
@@ -107,6 +140,8 @@
 			type: 'food',
 			amount: '',
 			account: '',
+			fromAccount: '',
+			toAccount: '',
 			notes: ''
 		};
 		
@@ -116,6 +151,11 @@
 	function formatNumberInput(value: string): string {
 		const digits = value.replace(/\D/g, '');
 		return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+	}
+	
+	function getAccountName(accountId: string): string {
+		const account = availableAccounts.find(a => a.id === accountId);
+		return account ? account.name : accountId;
 	}
 </script>
 
@@ -249,7 +289,7 @@
 		<Dialog.Header>
 			<Dialog.Title>Add New Transaction</Dialog.Title>
 			<Dialog.Description>
-				Record a new income, expense, or transfer.
+				Record a new income, expense, or transfer between accounts.
 			</Dialog.Description>
 		</Dialog.Header>
 		
@@ -296,7 +336,7 @@
 				<Label for="description">Description *</Label>
 				<Input
 					id="description"
-					placeholder="e.g., Lunch at restaurant"
+					placeholder={descriptionPlaceholder}
 					bind:value={formData.description}
 					required
 				/>
@@ -325,15 +365,63 @@
 					</div>
 				</div>
 				
-				<div class="space-y-2">
-					<Label for="account">Account</Label>
-					<Input
-						id="account"
-						placeholder="e.g., BCA Debit"
-						bind:value={formData.account}
-					/>
-				</div>
+				{#if formData.category !== 'transfer'}
+					<div class="space-y-2">
+						<Label for="account">Account</Label>
+						<Input
+							id="account"
+							placeholder="e.g., BCA Debit"
+							bind:value={formData.account}
+						/>
+					</div>
+				{/if}
 			</div>
+			
+			{#if formData.category === 'transfer'}
+				<div class="grid grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="fromAccount">From Account *</Label>
+						<select
+							id="fromAccount"
+							bind:value={formData.fromAccount}
+							class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							required={formData.category === 'transfer'}
+						>
+							<option value="">Select account</option>
+							{#each availableAccounts as account}
+								<option value={account.id}>
+									{account.name}
+									{#if account.institution}
+										({account.institution})
+									{/if}
+									- {formatCurrency(account.balance)}
+								</option>
+							{/each}
+						</select>
+					</div>
+					
+					<div class="space-y-2">
+						<Label for="toAccount">To Account *</Label>
+						<select
+							id="toAccount"
+							bind:value={formData.toAccount}
+							class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							required={formData.category === 'transfer'}
+						>
+							<option value="">Select account</option>
+							{#each availableAccounts as account}
+								<option value={account.id} disabled={account.id === formData.fromAccount}>
+									{account.name}
+									{#if account.institution}
+										({account.institution})
+									{/if}
+									- {formatCurrency(account.balance)}
+								</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+			{/if}
 			
 			<div class="space-y-2">
 				<Label for="notes">Notes</Label>
