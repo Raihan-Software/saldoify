@@ -3,67 +3,121 @@
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Plus, TrendingUp, TrendingDown, Activity } from '@lucide/svelte';
+	import { Plus, TrendingUp, TrendingDown, Activity, Calendar, Wallet, ArrowRightLeft, FileText, Hash, CreditCard, MoreVertical, Edit, Trash2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import PageHeader from '$lib/components/page-header.svelte';
-	import { 
-		mockTransactions, 
-		groupTransactionsByDate,
-		calculateDailyTotal,
-		getCategoryIcon,
-		getCategoryColor,
-		transactionCategories,
-		type Transaction 
-	} from '$lib/modules/transactions/transactions-data';
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import type { PageData } from './$types';
+	
+	let { data }: { data: PageData } = $props();
 
-	let transactions = $state(mockTransactions);
 	let showAddModal = $state(false);
+	let showEditModal = $state(false);
+	let showDeleteModal = $state(false);
+	let isSubmitting = $state(false);
+	let editingTransaction = $state<any>(null);
+	let deletingTransaction = $state<any>(null);
 	
 	// Group transactions by date
-	let groupedTransactions = $derived(groupTransactionsByDate(transactions));
-	
-	// Calculate monthly totals
-	let monthlyTotals = $derived((() => {
-		const now = new Date();
-		const thisMonth = transactions.filter(t => 
-			t.date.getMonth() === now.getMonth() && 
-			t.date.getFullYear() === now.getFullYear()
-		);
+	let groupedTransactions = $derived.by(() => {
+		const groups: Record<string, typeof data.transactions> = {};
 		
-		const income = thisMonth
-			.filter(t => t.category === 'income')
-			.reduce((sum, t) => sum + t.amount, 0);
-		
-		const expense = thisMonth
-			.filter(t => t.category === 'expense')
-			.reduce((sum, t) => sum + t.amount, 0);
+		data.transactions.forEach(transaction => {
+			const date = new Date(transaction.transactionDate);
+			const dateKey = date.toDateString();
 			
-		return { income, expense, net: income - expense };
-	})());
+			if (!groups[dateKey]) {
+				groups[dateKey] = [];
+			}
+			groups[dateKey].push(transaction);
+		});
+		
+		return groups;
+	});
+	
+	// Calculate daily totals
+	function calculateDailyTotal(transactions: typeof data.transactions, type: 'income' | 'expense' | 'all' = 'all') {
+		return transactions.reduce((total, t) => {
+			const amount = parseFloat(t.amount);
+			if (type === 'all') {
+				return total + (t.type === 'income' ? amount : -amount);
+			}
+			return t.type === type ? total + amount : total;
+		}, 0);
+	}
+	
+	// Use monthly totals from server
+	let monthlyTotals = $derived({
+		income: data.monthlyTotals.income,
+		expense: data.monthlyTotals.expense,
+		net: data.monthlyTotals.income - data.monthlyTotals.expense
+	});
+	
+	// Format date for datetime-local input (preserving local timezone)
+	function formatDateForInput(date: Date | string): string {
+		const dateObj = typeof date === 'string' ? new Date(date) : date;
+		
+		// Get local date components
+		const year = dateObj.getFullYear();
+		const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+		const day = String(dateObj.getDate()).padStart(2, '0');
+		const hours = String(dateObj.getHours()).padStart(2, '0');
+		const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+		
+		return `${year}-${month}-${day}T${hours}:${minutes}`;
+	}
 	
 	// Form state
 	let formData = $state({
-		date: new Date().toISOString().split('T')[0],
+		date: formatDateForInput(new Date()), // Format: YYYY-MM-DDTHH:MM in local timezone
 		description: '',
-		category: 'expense' as Transaction['category'],
-		type: 'food',
+		category: 'expense' as 'income' | 'expense' | 'transfer',
+		type: '',
 		amount: '',
 		account: '',
+		fromAccount: '',
+		toAccount: '',
 		notes: ''
 	});
 	
-	// Update available types when category changes
-	let availableTypes = $derived(
-		transactionCategories[formData.category].types
+	// Get available accounts from database
+	const availableAccounts = $derived(data.liquidAssets.map(asset => ({
+		id: asset.id,
+		name: asset.name,
+		institution: asset.bankName,
+		balance: parseFloat(asset.currentValue)
+	})));
+	
+	// Get available categories based on transaction type
+	let availableCategories = $derived(
+		formData.category === 'income' ? data.transactionCategories.income :
+		formData.category === 'expense' ? data.transactionCategories.expense :
+		formData.category === 'transfer' ? data.transactionCategories.transfer :
+		[]
+	);
+	
+	// Dynamic placeholders based on category
+	let descriptionPlaceholder = $derived(
+		formData.category === 'income' ? 'e.g., Monthly salary' :
+		formData.category === 'expense' ? 'e.g., Lunch at restaurant' :
+		formData.category === 'transfer' ? 'e.g., Transfer to savings' :
+		'Enter description'
 	);
 	
 	// Reset type when category changes
 	$effect(() => {
-		const types = Object.keys(availableTypes);
-		if (!types.includes(formData.type)) {
-			formData.type = types[0];
+		// Set first available category when transaction type changes
+		if (availableCategories.length > 0 && !availableCategories.find(cat => cat.id === formData.type)) {
+			formData.type = availableCategories[0].id;
+		}
+		// Clear transfer-specific fields when switching away from transfer
+		if (formData.category !== 'transfer') {
+			formData.fromAccount = '';
+			formData.toAccount = '';
 		}
 	});
 
@@ -76,46 +130,65 @@
 		}).format(amount);
 	}
 
-	function formatTime(date: Date): string {
+	function formatTime(date: Date | string): string {
+		const dateObj = typeof date === 'string' ? new Date(date) : date;
 		return new Intl.DateTimeFormat('id-ID', {
 			hour: '2-digit',
 			minute: '2-digit'
-		}).format(date);
+		}).format(dateObj);
 	}
 	
-	function handleAddTransaction() {
-		if (!formData.description || !formData.amount) return;
+	function formatDate(date: Date | string): string {
+		const dateObj = typeof date === 'string' ? new Date(date) : date;
+		const today = new Date();
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
 		
-		const newTransaction: Transaction = {
-			id: Date.now().toString(),
-			date: new Date(formData.date),
-			description: formData.description,
-			category: formData.category,
-			type: formData.type,
-			amount: parseFloat(formData.amount),
-			account: formData.account || undefined,
-			notes: formData.notes || undefined
-		};
-		
-		transactions = [...transactions, newTransaction];
-		
-		// Reset form
+		if (dateObj.toDateString() === today.toDateString()) {
+			return 'Today';
+		} else if (dateObj.toDateString() === yesterday.toDateString()) {
+			return 'Yesterday';
+		} else {
+			return new Intl.DateTimeFormat('id-ID', {
+				weekday: 'long',
+				day: 'numeric',
+				month: 'long',
+				year: 'numeric'
+			}).format(dateObj);
+		}
+	}
+	
+	function resetForm() {
 		formData = {
-			date: new Date().toISOString().split('T')[0],
+			date: formatDateForInput(new Date()),
 			description: '',
 			category: 'expense',
-			type: 'food',
+			type: '',
 			amount: '',
 			account: '',
+			fromAccount: '',
+			toAccount: '',
 			notes: ''
 		};
-		
-		showAddModal = false;
 	}
 	
 	function formatNumberInput(value: string): string {
 		const digits = value.replace(/\D/g, '');
 		return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+	}
+	
+	function getAccountName(accountId: string): string {
+		const account = availableAccounts.find(a => a.id === accountId);
+		return account ? account.name : accountId;
+	}
+	
+	function getCategoryName(categoryId: string, type: string): string {
+		const categories = type === 'income' ? data.transactionCategories.income :
+															 type === 'expense' ? data.transactionCategories.expense :
+															 type === 'transfer' ? data.transactionCategories.transfer :
+															 [];
+		const category = categories.find(c => c.id === categoryId);
+		return category ? category.label : categoryId;
 	}
 </script>
 
@@ -178,17 +251,23 @@
 
 	<!-- Transactions by Day -->
 	<div class="space-y-6">
-		{#each groupedTransactions as [dateKey, dayTransactions]}
-			{@const dailyTotal = calculateDailyTotal(dayTransactions)}
+		{#if Object.keys(groupedTransactions).length === 0}
+			<Card>
+				<CardContent class="py-12 text-center">
+					<p class="text-muted-foreground">No transactions yet. Add your first transaction!</p>
+				</CardContent>
+			</Card>
+		{:else}
+			{#each Object.entries(groupedTransactions) as [dateKey, dayTransactions]}
 			<Card>
 				<CardHeader class="pb-4">
 					<div class="flex items-center justify-between">
-						<CardTitle class="text-lg">{dateKey}</CardTitle>
+						<CardTitle class="text-lg">{formatDate(dateKey)}</CardTitle>
 						<div class="flex items-center gap-4 text-sm">
-							<span class="text-green-600">+{formatCurrency(dailyTotal.income)}</span>
-							<span class="text-red-600">-{formatCurrency(dailyTotal.expense)}</span>
-							<span class="font-medium {dailyTotal.net >= 0 ? 'text-green-600' : 'text-red-600'}">
-								{dailyTotal.net >= 0 ? '+' : ''}{formatCurrency(dailyTotal.net)}
+							<span class="text-green-600">+{formatCurrency(calculateDailyTotal(dayTransactions, 'income'))}</span>
+							<span class="text-red-600">-{formatCurrency(calculateDailyTotal(dayTransactions, 'expense'))}</span>
+							<span class="font-medium {calculateDailyTotal(dayTransactions) >= 0 ? 'text-green-600' : 'text-red-600'}">
+								{calculateDailyTotal(dayTransactions) >= 0 ? '+' : ''}{formatCurrency(calculateDailyTotal(dayTransactions))}
 							</span>
 						</div>
 					</div>
@@ -202,13 +281,14 @@
 								<TableHead>Category</TableHead>
 								<TableHead>Account</TableHead>
 								<TableHead class="text-right">Amount</TableHead>
+								<TableHead class="w-[50px]"></TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{#each dayTransactions as transaction}
 								<TableRow>
 									<TableCell class="text-muted-foreground">
-										{formatTime(transaction.date)}
+										{formatTime(transaction.transactionDate)}
 									</TableCell>
 									<TableCell class="font-medium">
 										{transaction.description}
@@ -218,20 +298,65 @@
 									</TableCell>
 									<TableCell>
 										<div class="flex items-center gap-2">
-											<span class="text-lg">{getCategoryIcon(transaction.category)}</span>
+											<span class="text-lg">{transaction.type === 'income' ? '💰' : '💸'}</span>
 											<div>
-												<p class="text-sm font-medium">{transactionCategories[transaction.category].label}</p>
+												<p class="text-sm font-medium">{transaction.type === 'income' ? 'Income' : 'Expense'}</p>
 												<p class="text-xs text-muted-foreground">
-													{availableTypes[transaction.type] || transaction.type}
+													{transaction.category?.label || '-'}
 												</p>
 											</div>
 										</div>
 									</TableCell>
-									<TableCell>{transaction.account || '-'}</TableCell>
+									<TableCell>
+										<div>
+											<p class="text-sm">{transaction.account?.name || '-'}</p>
+											{#if transaction.account?.bankName}
+												<p class="text-xs text-muted-foreground">{transaction.account.bankName}</p>
+											{/if}
+										</div>
+									</TableCell>
 									<TableCell class="text-right">
-										<span class="font-medium {getCategoryColor(transaction.category)}">
-											{transaction.category === 'income' ? '+' : transaction.category === 'expense' ? '-' : ''}{formatCurrency(transaction.amount)}
+										<span class="font-medium {transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}">
+											{transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
 										</span>
+									</TableCell>
+									<TableCell>
+										<DropdownMenu.Root>
+											<DropdownMenu.Trigger>
+												<Button variant="ghost" class="h-8 w-8 p-0">
+													<span class="sr-only">Open menu</span>
+													<MoreVertical class="h-4 w-4" />
+												</Button>
+											</DropdownMenu.Trigger>
+											<DropdownMenu.Content align="end">
+												<DropdownMenu.Item onclick={() => {
+													editingTransaction = transaction;
+													formData = {
+														date: formatDateForInput(transaction.transactionDate),
+														description: transaction.description,
+														category: transaction.type as 'income' | 'expense' | 'transfer',
+														type: transaction.category?.id || '',
+														amount: transaction.amount,
+														account: transaction.account?.id || '',
+														fromAccount: '',
+														toAccount: '',
+														notes: transaction.notes || ''
+													};
+													showEditModal = true;
+												}}>
+													<Edit class="mr-2 h-4 w-4" />
+													<span>Edit</span>
+												</DropdownMenu.Item>
+												<DropdownMenu.Separator />
+												<DropdownMenu.Item class="text-red-600" onclick={() => {
+													deletingTransaction = transaction;
+													showDeleteModal = true;
+												}}>
+													<Trash2 class="mr-2 h-4 w-4" />
+													<span>Delete</span>
+												</DropdownMenu.Item>
+											</DropdownMenu.Content>
+										</DropdownMenu.Root>
 									</TableCell>
 								</TableRow>
 							{/each}
@@ -239,79 +364,416 @@
 					</Table>
 				</CardContent>
 			</Card>
-		{/each}
+			{/each}
+		{/if}
 	</div>
 </div>
 
 <!-- Add Transaction Modal -->
 <Dialog.Root bind:open={showAddModal}>
-	<Dialog.Content class="sm:max-w-[500px]">
+	<Dialog.Content class="sm:max-w-[600px]">
 		<Dialog.Header>
-			<Dialog.Title>Add New Transaction</Dialog.Title>
+			<Dialog.Title>New Transaction</Dialog.Title>
 			<Dialog.Description>
-				Record a new income, expense, or transfer.
+				Record your income, expense, or transfer
 			</Dialog.Description>
 		</Dialog.Header>
 		
-		<form onsubmit={(e) => { e.preventDefault(); handleAddTransaction(); }} class="space-y-4">
+		<form 
+			method="POST" 
+			action="?/create"
+			use:enhance={() => {
+				isSubmitting = true;
+				return async ({ result }) => {
+					isSubmitting = false;
+					if (result.type === 'success') {
+						showAddModal = false;
+						resetForm();
+						await invalidateAll();
+					}
+				};
+			}}
+			class="space-y-6 mt-6"
+		>
+			<!-- Category Selection - Visual Cards -->
+			<div class="space-y-2">
+				<Label class="text-sm font-medium text-gray-700">Transaction Type</Label>
+				<input type="hidden" name="type" value={formData.category} />
+				<div class="grid grid-cols-3 gap-3">
+					{#each [['income', '💰', 'Income'], ['expense', '💸', 'Expense'], ['transfer', '🔄', 'Transfer']] as [value, icon, label]}
+						<button
+							type="button"
+							onclick={() => formData.category = value}
+							class="relative p-4 rounded-lg border-2 transition-all duration-200 {
+								formData.category === value 
+									? value === 'income' ? 'border-green-500 bg-green-50' 
+									: value === 'expense' ? 'border-red-500 bg-red-50'
+									: 'border-blue-500 bg-blue-50'
+									: 'border-gray-200 bg-gray-50 hover:border-gray-300'
+							}"
+						>
+							<div class="text-2xl mb-1">{icon}</div>
+							<div class="text-sm font-medium {
+								formData.category === value 
+									? value === 'income' ? 'text-green-700' 
+									: value === 'expense' ? 'text-red-700'
+									: 'text-blue-700'
+									: 'text-gray-700'
+							}">{label}</div>
+							{#if formData.category === value}
+								<div class="absolute top-2 right-2 w-2 h-2 rounded-full {
+									value === 'income' ? 'bg-green-500' 
+									: value === 'expense' ? 'bg-red-500'
+									: 'bg-blue-500'
+								}"></div>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			</div>
+			
+			<!-- Date and Type Row -->
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<Label for="date">Date</Label>
+					<Label for="date" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Calendar class="w-4 h-4" />
+						Date & Time
+					</Label>
 					<Input
 						id="date"
-						type="date"
+						name="transactionDate"
+						type="datetime-local"
 						bind:value={formData.date}
+						class="h-11"
 						required
 					/>
 				</div>
 				
 				<div class="space-y-2">
-					<Label for="category">Category</Label>
+					<Label for="type" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Hash class="w-4 h-4" />
+						Category
+					</Label>
 					<select
-						id="category"
-						bind:value={formData.category}
-						class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						id="type"
+						name="categoryId"
+						bind:value={formData.type}
+						class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						required
 					>
-						{#each Object.entries(transactionCategories) as [value, { label, icon }]}
-							<option {value}>{icon} {label}</option>
+						<option value="">Select category</option>
+						{#each availableCategories as category}
+							<option value={category.id}>{category.label}</option>
 						{/each}
 					</select>
 				</div>
 			</div>
 			
+			<!-- Description -->
 			<div class="space-y-2">
-				<Label for="type">Type</Label>
-				<select
-					id="type"
-					bind:value={formData.type}
-					class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-				>
-					{#each Object.entries(availableTypes) as [value, label]}
-						<option {value}>{label}</option>
-					{/each}
-				</select>
-			</div>
-			
-			<div class="space-y-2">
-				<Label for="description">Description *</Label>
+				<Label for="description" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+					<FileText class="w-4 h-4" />
+					Description
+				</Label>
 				<Input
 					id="description"
-					placeholder="e.g., Lunch at restaurant"
+					name="description"
+					placeholder={descriptionPlaceholder}
 					bind:value={formData.description}
+					class="h-11"
 					required
 				/>
 			</div>
 			
+			<!-- Amount and Account -->
 			<div class="grid grid-cols-2 gap-4">
 				<div class="space-y-2">
-					<Label for="amount">Amount *</Label>
+					<Label for="amount" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Wallet class="w-4 h-4" />
+						Amount
+					</Label>
 					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">Rp</span>
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base font-medium text-gray-500">Rp</span>
 						<Input
 							id="amount"
+							name="amount"
 							type="text"
 							placeholder="0"
-							class="pl-10"
+							class="pl-12 h-11 text-lg font-medium"
+							bind:value={formData.amount}
+							oninput={(e) => {
+								const target = e.currentTarget;
+								const value = target.value;
+								const formatted = formatNumberInput(value);
+								formData.amount = value.replace(/\D/g, '');
+								target.value = formatted;
+							}}
+							required
+						/>
+					</div>
+				</div>
+				
+				{#if formData.category !== 'transfer'}
+					<div class="space-y-2">
+						<Label for="account" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+							<CreditCard class="w-4 h-4" />
+							Account
+						</Label>
+						<select
+							id="account"
+							name="assetId"
+							bind:value={formData.account}
+							class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+							required={formData.category !== 'transfer'}
+						>
+							<option value="">Select account</option>
+							{#each availableAccounts as account}
+								<option value={account.id}>
+									{account.name}
+									{#if account.institution}
+										({account.institution})
+									{/if}
+								</option>
+							{/each}
+						</select>
+					</div>
+				{/if}
+			</div>
+			
+			<!-- Transfer Accounts -->
+			{#if formData.category === 'transfer'}
+				<div class="space-y-4">
+					<div class="flex items-center justify-center">
+						<ArrowRightLeft class="w-5 h-5 text-blue-500" />
+					</div>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="fromAccount" class="text-sm font-medium text-gray-700">From Account</Label>
+							<select
+								id="fromAccount"
+								bind:value={formData.fromAccount}
+								class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+								required={formData.category === 'transfer'}
+							>
+								<option value="">Select source</option>
+								{#each availableAccounts as account}
+									<option value={account.id}>
+										{account.name} • {formatCurrency(account.balance)}
+									</option>
+								{/each}
+							</select>
+						</div>
+						
+						<div class="space-y-2">
+							<Label for="toAccount" class="text-sm font-medium text-gray-700">To Account</Label>
+							<select
+								id="toAccount"
+								bind:value={formData.toAccount}
+								class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+								required={formData.category === 'transfer'}
+							>
+								<option value="">Select destination</option>
+								{#each availableAccounts as account}
+									<option value={account.id} disabled={account.id === formData.fromAccount}>
+										{account.name} • {formatCurrency(account.balance)}
+									</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+				</div>
+			{/if}
+			
+			<!-- Notes - Optional -->
+			<div class="space-y-2">
+				<Label for="notes" class="text-sm font-medium text-gray-700">Notes (Optional)</Label>
+				<textarea
+					id="notes"
+					name="notes"
+					placeholder="Add any additional details..."
+					bind:value={formData.notes}
+					class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+				/>
+			</div>
+			
+			<!-- Transaction Summary -->
+			{#if formData.amount && formData.description}
+				<div class="rounded-lg bg-gray-50 p-4 space-y-2">
+					<div class="text-sm font-medium text-gray-700">Transaction Preview</div>
+					<div class="flex items-center justify-between">
+						<span class="text-sm text-gray-600">{formData.description}</span>
+						<span class="font-semibold {
+							formData.category === 'income' ? 'text-green-600' : 
+							formData.category === 'expense' ? 'text-red-600' : 
+							'text-blue-600'
+						}">
+							{formData.category === 'income' ? '+' : formData.category === 'expense' ? '-' : ''}
+							{formatCurrency(parseFloat(formData.amount) || 0)}
+						</span>
+					</div>
+					{#if formData.category === 'transfer' && formData.fromAccount && formData.toAccount}
+						<div class="text-xs text-gray-500">
+							{getAccountName(formData.fromAccount)} → {getAccountName(formData.toAccount)}
+						</div>
+					{:else if formData.account}
+						<div class="text-xs text-gray-500">
+							From: {getAccountName(formData.account)}
+						</div>
+					{/if}
+				</div>
+			{/if}
+			
+			<Dialog.Footer class="flex gap-3 justify-end pt-4 border-t">
+				<Button type="button" variant="outline" onclick={() => showAddModal = false}>
+					Cancel
+				</Button>
+				<Button 
+					type="submit" 
+					disabled={isSubmitting}
+					class="{
+						formData.category === 'income' ? 'bg-green-600 hover:bg-green-700' : 
+						formData.category === 'expense' ? 'bg-red-600 hover:bg-red-700' : 
+						'bg-blue-600 hover:bg-blue-700'
+					}"
+				>
+					{isSubmitting ? 'Adding...' : `Add ${formData.category === 'income' ? 'Income' : formData.category === 'expense' ? 'Expense' : 'Transfer'}`}
+				</Button>
+			</Dialog.Footer>
+		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Edit Transaction Modal -->
+<Dialog.Root bind:open={showEditModal}>
+	<Dialog.Content class="sm:max-w-[600px]">
+		<Dialog.Header>
+			<Dialog.Title>Edit Transaction</Dialog.Title>
+			<Dialog.Description>
+				Update your transaction details
+			</Dialog.Description>
+		</Dialog.Header>
+		
+		<form 
+			method="POST" 
+			action="?/update"
+			use:enhance={() => {
+				isSubmitting = true;
+				return async ({ result }) => {
+					isSubmitting = false;
+					if (result.type === 'success') {
+						showEditModal = false;
+						editingTransaction = null;
+						resetForm();
+						await invalidateAll();
+					}
+				};
+			}}
+			class="space-y-6 mt-6"
+		>
+			<input type="hidden" name="id" value={editingTransaction?.id} />
+			
+			<!-- Category Selection - Visual Cards -->
+			<div class="space-y-2">
+				<Label class="text-sm font-medium text-gray-700">Transaction Type</Label>
+				<input type="hidden" name="type" value={formData.category} />
+				<div class="grid grid-cols-2 gap-3">
+					{#each [['income', '💰', 'Income'], ['expense', '💸', 'Expense']] as [value, icon, label]}
+						<button
+							type="button"
+							onclick={() => formData.category = value}
+							class="relative p-4 rounded-lg border-2 transition-all duration-200 {
+								formData.category === value 
+									? value === 'income' ? 'border-green-500 bg-green-50' 
+									: 'border-red-500 bg-red-50'
+									: 'border-gray-200 bg-gray-50 hover:border-gray-300'
+							}"
+						>
+							<div class="text-2xl mb-1">{icon}</div>
+							<div class="text-sm font-medium {
+								formData.category === value 
+									? value === 'income' ? 'text-green-700' 
+									: 'text-red-700'
+									: 'text-gray-700'
+							}">{label}</div>
+							{#if formData.category === value}
+								<div class="absolute top-2 right-2 w-2 h-2 rounded-full {
+									value === 'income' ? 'bg-green-500' 
+									: 'bg-red-500'
+								}"></div>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			</div>
+			
+			<!-- Date and Type Row -->
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-date" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Calendar class="w-4 h-4" />
+						Date & Time
+					</Label>
+					<Input
+						id="edit-date"
+						name="transactionDate"
+						type="datetime-local"
+						bind:value={formData.date}
+						class="h-11"
+						required
+					/>
+				</div>
+				
+				<div class="space-y-2">
+					<Label for="edit-type" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Hash class="w-4 h-4" />
+						Category
+					</Label>
+					<select
+						id="edit-type"
+						name="categoryId"
+						bind:value={formData.type}
+						class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						required
+					>
+						<option value="">Select category</option>
+						{#each availableCategories as category}
+							<option value={category.id}>{category.label}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
+			
+			<!-- Description -->
+			<div class="space-y-2">
+				<Label for="edit-description" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+					<FileText class="w-4 h-4" />
+					Description
+				</Label>
+				<Input
+					id="edit-description"
+					name="description"
+					placeholder={descriptionPlaceholder}
+					bind:value={formData.description}
+					class="h-11"
+					required
+				/>
+			</div>
+			
+			<!-- Amount and Account -->
+			<div class="grid grid-cols-2 gap-4">
+				<div class="space-y-2">
+					<Label for="edit-amount" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<Wallet class="w-4 h-4" />
+						Amount
+					</Label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base font-medium text-gray-500">Rp</span>
+						<Input
+							id="edit-amount"
+							name="amount"
+							type="text"
+							placeholder="0"
+							class="pl-12 h-11 text-lg font-medium"
 							bind:value={formData.amount}
 							oninput={(e) => {
 								const target = e.currentTarget;
@@ -326,33 +788,118 @@
 				</div>
 				
 				<div class="space-y-2">
-					<Label for="account">Account</Label>
-					<Input
-						id="account"
-						placeholder="e.g., BCA Debit"
+					<Label for="edit-account" class="flex items-center gap-2 text-sm font-medium text-gray-700">
+						<CreditCard class="w-4 h-4" />
+						Account
+					</Label>
+					<select
+						id="edit-account"
+						name="assetId"
 						bind:value={formData.account}
-					/>
+						class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						required
+					>
+						<option value="">Select account</option>
+						{#each availableAccounts as account}
+							<option value={account.id}>
+								{account.name}
+								{#if account.institution}
+									({account.institution})
+								{/if}
+							</option>
+						{/each}
+					</select>
 				</div>
 			</div>
 			
+			<!-- Notes - Optional -->
 			<div class="space-y-2">
-				<Label for="notes">Notes</Label>
+				<Label for="edit-notes" class="text-sm font-medium text-gray-700">Notes (Optional)</Label>
 				<textarea
-					id="notes"
-					placeholder="Additional details..."
+					id="edit-notes"
+					name="notes"
+					placeholder="Add any additional details..."
 					bind:value={formData.notes}
-					class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-				/>
+					class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+				></textarea>
 			</div>
 			
-			<Dialog.Footer>
-				<Button type="button" variant="outline" onclick={() => showAddModal = false}>
+			<Dialog.Footer class="flex gap-3 justify-end pt-4 border-t">
+				<Button type="button" variant="outline" onclick={() => {
+					showEditModal = false;
+					editingTransaction = null;
+					resetForm();
+				}}>
 					Cancel
 				</Button>
-				<Button type="submit">
-					Add Transaction
+				<Button 
+					type="submit" 
+					disabled={isSubmitting}
+					class="{
+						formData.category === 'income' ? 'bg-green-600 hover:bg-green-700' : 
+						'bg-red-600 hover:bg-red-700'
+					}"
+				>
+					{isSubmitting ? 'Updating...' : 'Update Transaction'}
 				</Button>
 			</Dialog.Footer>
 		</form>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Delete Confirmation Modal -->
+<Dialog.Root bind:open={showDeleteModal}>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<Dialog.Header>
+			<Dialog.Title>Delete Transaction</Dialog.Title>
+			<Dialog.Description>
+				Are you sure you want to delete this transaction? This action cannot be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+		
+		{#if deletingTransaction}
+			<div class="my-4 p-4 bg-gray-50 rounded-lg">
+				<p class="font-medium">{deletingTransaction.description}</p>
+				<p class="text-sm text-muted-foreground mt-1">
+					<span class="{deletingTransaction.type === 'income' ? 'text-green-600' : 'text-red-600'}">
+						{deletingTransaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(deletingTransaction.amount))}
+					</span>
+					• {deletingTransaction.category?.label}
+				</p>
+			</div>
+		{/if}
+		
+		<Dialog.Footer class="flex gap-3 justify-end">
+			<Button variant="outline" onclick={() => {
+				showDeleteModal = false;
+				deletingTransaction = null;
+			}}>
+				Cancel
+			</Button>
+			<form 
+				method="POST" 
+				action="?/delete"
+				use:enhance={() => {
+					isSubmitting = true;
+					return async ({ result }) => {
+						isSubmitting = false;
+						if (result.type === 'success') {
+							showDeleteModal = false;
+							deletingTransaction = null;
+							await invalidateAll();
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="id" value={deletingTransaction?.id} />
+				<Button 
+					type="submit" 
+					variant="destructive"
+					disabled={isSubmitting}
+				>
+					{isSubmitting ? 'Deleting...' : 'Delete Transaction'}
+				</Button>
+			</form>
+		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
