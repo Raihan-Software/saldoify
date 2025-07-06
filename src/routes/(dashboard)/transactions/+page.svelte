@@ -8,48 +8,55 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import PageHeader from '$lib/components/page-header.svelte';
-	import { 
-		mockTransactions, 
-		groupTransactionsByDate,
-		calculateDailyTotal,
-		getCategoryIcon,
-		getCategoryColor,
-		type Transaction 
-	} from '$lib/modules/transactions/transactions-data';
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	
 	let { data }: { data: PageData } = $props();
 
-	let transactions = $state(mockTransactions);
 	let showAddModal = $state(false);
+	let isSubmitting = $state(false);
 	
 	// Group transactions by date
-	let groupedTransactions = $derived(groupTransactionsByDate(transactions));
-	
-	// Calculate monthly totals
-	let monthlyTotals = $derived((() => {
-		const now = new Date();
-		const thisMonth = transactions.filter(t => 
-			t.date.getMonth() === now.getMonth() && 
-			t.date.getFullYear() === now.getFullYear()
-		);
+	let groupedTransactions = $derived.by(() => {
+		const groups: Record<string, typeof data.transactions> = {};
 		
-		const income = thisMonth
-			.filter(t => t.category === 'income')
-			.reduce((sum, t) => sum + t.amount, 0);
-		
-		const expense = thisMonth
-			.filter(t => t.category === 'expense')
-			.reduce((sum, t) => sum + t.amount, 0);
+		data.transactions.forEach(transaction => {
+			const date = new Date(transaction.transactionDate);
+			const dateKey = date.toDateString();
 			
-		return { income, expense, net: income - expense };
-	})());
+			if (!groups[dateKey]) {
+				groups[dateKey] = [];
+			}
+			groups[dateKey].push(transaction);
+		});
+		
+		return groups;
+	});
+	
+	// Calculate daily totals
+	function calculateDailyTotal(transactions: typeof data.transactions, type: 'income' | 'expense' | 'all' = 'all') {
+		return transactions.reduce((total, t) => {
+			const amount = parseFloat(t.amount);
+			if (type === 'all') {
+				return total + (t.type === 'income' ? amount : -amount);
+			}
+			return t.type === type ? total + amount : total;
+		}, 0);
+	}
+	
+	// Use monthly totals from server
+	let monthlyTotals = $derived({
+		income: data.monthlyTotals.income,
+		expense: data.monthlyTotals.expense,
+		net: data.monthlyTotals.income - data.monthlyTotals.expense
+	});
 	
 	// Form state
 	let formData = $state({
 		date: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
 		description: '',
-		category: 'expense' as Transaction['category'],
+		category: 'expense' as 'income' | 'expense' | 'transfer',
 		type: '',
 		amount: '',
 		account: '',
@@ -63,12 +70,15 @@
 		id: asset.id,
 		name: asset.name,
 		institution: asset.bankName,
-		balance: asset.currentValue
+		balance: parseFloat(asset.currentValue)
 	})));
 	
 	// Get available categories based on transaction type
 	let availableCategories = $derived(
-		data.transactionCategories[formData.category] || []
+		formData.category === 'income' ? data.transactionCategories.income :
+		formData.category === 'expense' ? data.transactionCategories.expense :
+		formData.category === 'transfer' ? data.transactionCategories.transfer :
+		[]
 	);
 	
 	// Dynamic placeholders based on category
@@ -101,44 +111,35 @@
 		}).format(amount);
 	}
 
-	function formatTime(date: Date): string {
+	function formatTime(date: Date | string): string {
+		const dateObj = typeof date === 'string' ? new Date(date) : date;
 		return new Intl.DateTimeFormat('id-ID', {
 			hour: '2-digit',
 			minute: '2-digit'
-		}).format(date);
+		}).format(dateObj);
 	}
 	
-	function handleAddTransaction() {
-		if (!formData.description || !formData.amount) return;
+	function formatDate(date: Date | string): string {
+		const dateObj = typeof date === 'string' ? new Date(date) : date;
+		const today = new Date();
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
 		
-		// Validate transfer specific fields
-		if (formData.category === 'transfer') {
-			if (!formData.fromAccount || !formData.toAccount) {
-				alert('Please select both source and destination accounts for the transfer');
-				return;
-			}
-			if (formData.fromAccount === formData.toAccount) {
-				alert('Source and destination accounts must be different');
-				return;
-			}
+		if (dateObj.toDateString() === today.toDateString()) {
+			return 'Today';
+		} else if (dateObj.toDateString() === yesterday.toDateString()) {
+			return 'Yesterday';
+		} else {
+			return new Intl.DateTimeFormat('id-ID', {
+				weekday: 'long',
+				day: 'numeric',
+				month: 'long',
+				year: 'numeric'
+			}).format(dateObj);
 		}
-		
-		const newTransaction: Transaction = {
-			id: Date.now().toString(),
-			date: new Date(formData.date),
-			description: formData.description,
-			category: formData.category,
-			type: formData.type,
-			amount: parseFloat(formData.amount),
-			account: formData.category === 'transfer' 
-				? `${getAccountName(formData.fromAccount)} → ${getAccountName(formData.toAccount)}`
-				: getAccountName(formData.account) || undefined,
-			notes: formData.notes || undefined
-		};
-		
-		transactions = [...transactions, newTransaction];
-		
-		// Reset form
+	}
+	
+	function resetForm() {
 		formData = {
 			date: new Date().toISOString().slice(0, 16),
 			description: '',
@@ -150,8 +151,6 @@
 			toAccount: '',
 			notes: ''
 		};
-		
-		showAddModal = false;
 	}
 	
 	function formatNumberInput(value: string): string {
@@ -165,7 +164,10 @@
 	}
 	
 	function getCategoryName(categoryId: string, type: string): string {
-		const categories = data.transactionCategories[type] || [];
+		const categories = type === 'income' ? data.transactionCategories.income :
+															 type === 'expense' ? data.transactionCategories.expense :
+															 type === 'transfer' ? data.transactionCategories.transfer :
+															 [];
 		const category = categories.find(c => c.id === categoryId);
 		return category ? category.label : categoryId;
 	}
@@ -230,17 +232,23 @@
 
 	<!-- Transactions by Day -->
 	<div class="space-y-6">
-		{#each groupedTransactions as [dateKey, dayTransactions]}
-			{@const dailyTotal = calculateDailyTotal(dayTransactions)}
+		{#if Object.keys(groupedTransactions).length === 0}
+			<Card>
+				<CardContent class="py-12 text-center">
+					<p class="text-muted-foreground">No transactions yet. Add your first transaction!</p>
+				</CardContent>
+			</Card>
+		{:else}
+			{#each Object.entries(groupedTransactions) as [dateKey, dayTransactions]}
 			<Card>
 				<CardHeader class="pb-4">
 					<div class="flex items-center justify-between">
-						<CardTitle class="text-lg">{dateKey}</CardTitle>
+						<CardTitle class="text-lg">{formatDate(dateKey)}</CardTitle>
 						<div class="flex items-center gap-4 text-sm">
-							<span class="text-green-600">+{formatCurrency(dailyTotal.income)}</span>
-							<span class="text-red-600">-{formatCurrency(dailyTotal.expense)}</span>
-							<span class="font-medium {dailyTotal.net >= 0 ? 'text-green-600' : 'text-red-600'}">
-								{dailyTotal.net >= 0 ? '+' : ''}{formatCurrency(dailyTotal.net)}
+							<span class="text-green-600">+{formatCurrency(calculateDailyTotal(dayTransactions, 'income'))}</span>
+							<span class="text-red-600">-{formatCurrency(calculateDailyTotal(dayTransactions, 'expense'))}</span>
+							<span class="font-medium {calculateDailyTotal(dayTransactions) >= 0 ? 'text-green-600' : 'text-red-600'}">
+								{calculateDailyTotal(dayTransactions) >= 0 ? '+' : ''}{formatCurrency(calculateDailyTotal(dayTransactions))}
 							</span>
 						</div>
 					</div>
@@ -260,7 +268,7 @@
 							{#each dayTransactions as transaction}
 								<TableRow>
 									<TableCell class="text-muted-foreground">
-										{formatTime(transaction.date)}
+										{formatTime(transaction.transactionDate)}
 									</TableCell>
 									<TableCell class="font-medium">
 										{transaction.description}
@@ -270,19 +278,26 @@
 									</TableCell>
 									<TableCell>
 										<div class="flex items-center gap-2">
-											<span class="text-lg">{getCategoryIcon(transaction.category)}</span>
+											<span class="text-lg">{transaction.type === 'income' ? '💰' : '💸'}</span>
 											<div>
-												<p class="text-sm font-medium">{transaction.category === 'income' ? 'Income' : transaction.category === 'expense' ? 'Expense' : 'Transfer'}</p>
+												<p class="text-sm font-medium">{transaction.type === 'income' ? 'Income' : 'Expense'}</p>
 												<p class="text-xs text-muted-foreground">
-													{transaction.type}
+													{transaction.category?.label || '-'}
 												</p>
 											</div>
 										</div>
 									</TableCell>
-									<TableCell>{transaction.account || '-'}</TableCell>
+									<TableCell>
+										<div>
+											<p class="text-sm">{transaction.account?.name || '-'}</p>
+											{#if transaction.account?.bankName}
+												<p class="text-xs text-muted-foreground">{transaction.account.bankName}</p>
+											{/if}
+										</div>
+									</TableCell>
 									<TableCell class="text-right">
-										<span class="font-medium {getCategoryColor(transaction.category)}">
-											{transaction.category === 'income' ? '+' : transaction.category === 'expense' ? '-' : ''}{formatCurrency(transaction.amount)}
+										<span class="font-medium {transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}">
+											{transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
 										</span>
 									</TableCell>
 								</TableRow>
@@ -291,7 +306,8 @@
 					</Table>
 				</CardContent>
 			</Card>
-		{/each}
+			{/each}
+		{/if}
 	</div>
 </div>
 
@@ -305,10 +321,26 @@
 			</Dialog.Description>
 		</Dialog.Header>
 		
-		<form onsubmit={(e) => { e.preventDefault(); handleAddTransaction(); }} class="space-y-6 mt-6">
+		<form 
+			method="POST" 
+			action="?/create"
+			use:enhance={() => {
+				isSubmitting = true;
+				return async ({ result }) => {
+					isSubmitting = false;
+					if (result.type === 'success') {
+						showAddModal = false;
+						resetForm();
+						await invalidateAll();
+					}
+				};
+			}}
+			class="space-y-6 mt-6"
+		>
 			<!-- Category Selection - Visual Cards -->
 			<div class="space-y-2">
 				<Label class="text-sm font-medium text-gray-700">Transaction Type</Label>
+				<input type="hidden" name="type" value={formData.category} />
 				<div class="grid grid-cols-3 gap-3">
 					{#each [['income', '💰', 'Income'], ['expense', '💸', 'Expense'], ['transfer', '🔄', 'Transfer']] as [value, icon, label]}
 						<button
@@ -351,6 +383,7 @@
 					</Label>
 					<Input
 						id="date"
+						name="transactionDate"
 						type="datetime-local"
 						bind:value={formData.date}
 						class="h-11"
@@ -365,6 +398,7 @@
 					</Label>
 					<select
 						id="type"
+						name="categoryId"
 						bind:value={formData.type}
 						class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 						required
@@ -385,6 +419,7 @@
 				</Label>
 				<Input
 					id="description"
+					name="description"
 					placeholder={descriptionPlaceholder}
 					bind:value={formData.description}
 					class="h-11"
@@ -403,6 +438,7 @@
 						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base font-medium text-gray-500">Rp</span>
 						<Input
 							id="amount"
+							name="amount"
 							type="text"
 							placeholder="0"
 							class="pl-12 h-11 text-lg font-medium"
@@ -427,6 +463,7 @@
 						</Label>
 						<select
 							id="account"
+							name="assetId"
 							bind:value={formData.account}
 							class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 							required={formData.category !== 'transfer'}
@@ -494,6 +531,7 @@
 				<Label for="notes" class="text-sm font-medium text-gray-700">Notes (Optional)</Label>
 				<textarea
 					id="notes"
+					name="notes"
 					placeholder="Add any additional details..."
 					bind:value={formData.notes}
 					class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
@@ -533,13 +571,14 @@
 				</Button>
 				<Button 
 					type="submit" 
+					disabled={isSubmitting}
 					class="{
 						formData.category === 'income' ? 'bg-green-600 hover:bg-green-700' : 
 						formData.category === 'expense' ? 'bg-red-600 hover:bg-red-700' : 
 						'bg-blue-600 hover:bg-blue-700'
 					}"
 				>
-					Add {formData.category === 'income' ? 'Income' : formData.category === 'expense' ? 'Expense' : 'Transfer'}
+					{isSubmitting ? 'Adding...' : `Add ${formData.category === 'income' ? 'Income' : formData.category === 'expense' ? 'Expense' : 'Transfer'}`}
 				</Button>
 			</Dialog.Footer>
 		</form>

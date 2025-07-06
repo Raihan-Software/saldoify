@@ -133,6 +133,31 @@ export const assets = pgTable('assets', {
 	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
+// Transactions table
+export const transactions = pgTable('transactions', {
+	id: text('id').primaryKey(),
+	userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+	
+	// Transaction details
+	type: text('type').notNull(), // 'income', 'expense'
+	categoryId: text('category_id').notNull().references(() => transactionCategories.id),
+	description: text('description').notNull(),
+	amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
+	
+	// Account association
+	assetId: text('asset_id').notNull().references(() => assets.id), // The liquid asset account
+	
+	// Date and time
+	transactionDate: timestamp('transaction_date', { withTimezone: true, mode: 'date' }).notNull(),
+	
+	// Additional info
+	notes: text('notes'),
+	
+	// Metadata
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
+});
+
 export type Session = typeof session.$inferSelect;
 export type User = typeof user.$inferSelect;
 export type PasswordResetToken = typeof passwordResetToken.$inferSelect;
@@ -143,3 +168,5 @@ export type AssetType = typeof assetTypes.$inferSelect;
 export type TransactionCategory = typeof transactionCategories.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
 export type InsertAsset = typeof assets.$inferInsert;
+export type Transaction = typeof transactions.$inferSelect;
+export type InsertTransaction = typeof transactions.$inferInsert;
