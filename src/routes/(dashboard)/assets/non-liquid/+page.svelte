@@ -4,7 +4,7 @@
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Plus, Edit, Trash2, TrendingUp, TrendingDown, Home, Calendar, MapPin, Package } from '@lucide/svelte';
+	import { Plus, Edit, Trash2, TrendingUp, TrendingDown, Home, Calendar, MapPin, Package, TrendingDownIcon } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -29,7 +29,9 @@
 		purchaseDate: '',
 		location: '',
 		quantity: '1',
-		notes: ''
+		notes: '',
+		depreciationType: 'none' as 'yearly' | 'monthly' | 'none',
+		usageYears: ''
 	});
 	
 	// Format currency for display
@@ -63,6 +65,20 @@
 	// Edit asset
 	function startEdit(asset: any) {
 		editingAsset = asset;
+		// Populate form data for edit
+		formData = {
+			assetTypeId: asset.assetTypeId || '',
+			name: asset.name || '',
+			description: asset.description || '',
+			currentValue: asset.currentValue || '',
+			purchaseValue: asset.purchaseValue || '',
+			purchaseDate: asset.purchaseDate ? new Date(asset.purchaseDate).toISOString().split('T')[0] : '',
+			location: asset.location || '',
+			quantity: asset.quantity?.toString() || '1',
+			notes: asset.notes || '',
+			depreciationType: 'none', // Will be populated from DB later
+			usageYears: '' // Will be populated from DB later
+		};
 		showEditModal = true;
 	}
 	
@@ -77,7 +93,9 @@
 			purchaseDate: '',
 			location: '',
 			quantity: '1',
-			notes: ''
+			notes: '',
+			depreciationType: 'none',
+			usageYears: ''
 		};
 	}
 	
@@ -89,6 +107,32 @@
 		if (purchase === 0) return null;
 		return ((current - purchase) / purchase) * 100;
 	}
+	
+	// Calculate depreciation
+	function calculateDepreciation() {
+		if (!formData.purchaseValue || !formData.usageYears || formData.depreciationType === 'none') {
+			return { yearly: 0, monthly: 0, total: 0 };
+		}
+		
+		const purchaseValue = parseFloat(formData.purchaseValue);
+		const years = parseFloat(formData.usageYears);
+		
+		if (isNaN(purchaseValue) || isNaN(years) || years <= 0) {
+			return { yearly: 0, monthly: 0, total: 0 };
+		}
+		
+		const yearlyDepreciation = purchaseValue / years;
+		const monthlyDepreciation = yearlyDepreciation / 12;
+		const totalDepreciation = purchaseValue;
+		
+		return {
+			yearly: yearlyDepreciation,
+			monthly: monthlyDepreciation,
+			total: totalDepreciation
+		};
+	}
+	
+	let depreciation = $derived(calculateDepreciation());
 </script>
 
 <div class="p-8 space-y-6">
@@ -403,6 +447,73 @@
 				/>
 			</div>
 			
+			<!-- Depreciation Section -->
+			<div class="space-y-4 border-t pt-4">
+				<h4 class="font-medium">Depreciation (Optional)</h4>
+				
+				<div class="space-y-2">
+					<Label>Depreciation Type</Label>
+					<div class="grid grid-cols-3 gap-2">
+						{#each [
+							{ value: 'none', label: 'No Depreciation' },
+							{ value: 'yearly', label: 'Yearly' },
+							{ value: 'monthly', label: 'Monthly' }
+						] as option}
+							<button
+								type="button"
+								onclick={() => formData.depreciationType = option.value}
+								class="px-3 py-2 text-sm border rounded-md transition-colors {
+									formData.depreciationType === option.value
+										? 'bg-primary text-primary-foreground border-primary'
+										: 'bg-background border-input hover:bg-muted'
+								}"
+							>
+								{option.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+				
+				{#if formData.depreciationType !== 'none'}
+					<div class="space-y-2">
+						<Label for="usageYears">Usage Years</Label>
+						<Input
+							id="usageYears"
+							name="usageYears"
+							type="number"
+							min="1"
+							step="0.5"
+							placeholder="e.g., 10"
+							bind:value={formData.usageYears}
+							required={formData.depreciationType !== 'none'}
+						/>
+						<p class="text-sm text-muted-foreground">
+							Expected useful life of the asset in years
+						</p>
+					</div>
+					
+					{#if formData.purchaseValue && formData.usageYears && depreciation.yearly > 0}
+						<div class="space-y-2 p-4 bg-muted rounded-md">
+							<p class="text-sm font-medium">Depreciation Calculation</p>
+							<div class="space-y-1 text-sm">
+								<div class="flex justify-between">
+									<span class="text-muted-foreground">Yearly Depreciation:</span>
+									<span>{displayCurrency(depreciation.yearly)}</span>
+								</div>
+								<div class="flex justify-between">
+									<span class="text-muted-foreground">Monthly Depreciation:</span>
+									<span>{displayCurrency(depreciation.monthly)}</span>
+								</div>
+								<div class="flex justify-between font-medium">
+									<span>Total over {formData.usageYears} years:</span>
+									<span>{displayCurrency(depreciation.total)}</span>
+								</div>
+							</div>
+						</div>
+					{/if}
+				{/if}
+			</div>
+			
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => showAddModal = false}>
 					Cancel
@@ -531,6 +642,73 @@
 						value={editingAsset.notes || ''}
 						class="min-h-[80px]"
 					/>
+				</div>
+				
+				<!-- Depreciation Section -->
+				<div class="space-y-4 border-t pt-4">
+					<h4 class="font-medium">Depreciation (Optional)</h4>
+					
+					<div class="space-y-2">
+						<Label>Depreciation Type</Label>
+						<div class="grid grid-cols-3 gap-2">
+							{#each [
+								{ value: 'none', label: 'No Depreciation' },
+								{ value: 'yearly', label: 'Yearly' },
+								{ value: 'monthly', label: 'Monthly' }
+							] as option}
+								<button
+									type="button"
+									onclick={() => formData.depreciationType = option.value}
+									class="px-3 py-2 text-sm border rounded-md transition-colors {
+										formData.depreciationType === option.value
+											? 'bg-primary text-primary-foreground border-primary'
+											: 'bg-background border-input hover:bg-muted'
+									}"
+								>
+									{option.label}
+								</button>
+							{/each}
+						</div>
+					</div>
+					
+					{#if formData.depreciationType !== 'none'}
+						<div class="space-y-2">
+							<Label for="edit-usageYears">Usage Years</Label>
+							<Input
+								id="edit-usageYears"
+								name="usageYears"
+								type="number"
+								min="1"
+								step="0.5"
+								placeholder="e.g., 10"
+								bind:value={formData.usageYears}
+								required={formData.depreciationType !== 'none'}
+							/>
+							<p class="text-sm text-muted-foreground">
+								Expected useful life of the asset in years
+							</p>
+						</div>
+						
+						{#if formData.purchaseValue && formData.usageYears && depreciation.yearly > 0}
+							<div class="space-y-2 p-4 bg-muted rounded-md">
+								<p class="text-sm font-medium">Depreciation Calculation</p>
+								<div class="space-y-1 text-sm">
+									<div class="flex justify-between">
+										<span class="text-muted-foreground">Yearly Depreciation:</span>
+										<span>{displayCurrency(depreciation.yearly)}</span>
+									</div>
+									<div class="flex justify-between">
+										<span class="text-muted-foreground">Monthly Depreciation:</span>
+										<span>{displayCurrency(depreciation.monthly)}</span>
+									</div>
+									<div class="flex justify-between font-medium">
+										<span>Total over {formData.usageYears} years:</span>
+										<span>{displayCurrency(depreciation.total)}</span>
+									</div>
+								</div>
+							</div>
+						{/if}
+					{/if}
 				</div>
 				
 				<Dialog.Footer>
