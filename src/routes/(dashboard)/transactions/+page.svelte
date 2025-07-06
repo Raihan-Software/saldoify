@@ -14,13 +14,11 @@
 		calculateDailyTotal,
 		getCategoryIcon,
 		getCategoryColor,
-		transactionCategories,
 		type Transaction 
 	} from '$lib/modules/transactions/transactions-data';
 	import type { PageData } from './$types';
 	
 	let { data }: { data: PageData } = $props();
-	console.log(data);
 
 	let transactions = $state(mockTransactions);
 	let showAddModal = $state(false);
@@ -52,7 +50,7 @@
 		date: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
 		description: '',
 		category: 'expense' as Transaction['category'],
-		type: 'food',
+		type: '',
 		amount: '',
 		account: '',
 		fromAccount: '',
@@ -68,9 +66,9 @@
 		balance: asset.currentValue
 	})));
 	
-	// Update available types when category changes
-	let availableTypes = $derived(
-		transactionCategories[formData.category].types
+	// Get available categories based on transaction type
+	let availableCategories = $derived(
+		data.transactionCategories[formData.category] || []
 	);
 	
 	// Dynamic placeholders based on category
@@ -83,9 +81,14 @@
 	
 	// Reset type when category changes
 	$effect(() => {
-		const types = Object.keys(availableTypes);
-		if (!types.includes(formData.type)) {
-			formData.type = types[0];
+		// Set first available category when transaction type changes
+		if (availableCategories.length > 0 && !availableCategories.find(cat => cat.id === formData.type)) {
+			formData.type = availableCategories[0].id;
+		}
+		// Clear transfer-specific fields when switching away from transfer
+		if (formData.category !== 'transfer') {
+			formData.fromAccount = '';
+			formData.toAccount = '';
 		}
 	});
 
@@ -140,7 +143,7 @@
 			date: new Date().toISOString().slice(0, 16),
 			description: '',
 			category: 'expense',
-			type: 'food',
+			type: '',
 			amount: '',
 			account: '',
 			fromAccount: '',
@@ -159,6 +162,12 @@
 	function getAccountName(accountId: string): string {
 		const account = availableAccounts.find(a => a.id === accountId);
 		return account ? account.name : accountId;
+	}
+	
+	function getCategoryName(categoryId: string, type: string): string {
+		const categories = data.transactionCategories[type] || [];
+		const category = categories.find(c => c.id === categoryId);
+		return category ? category.label : categoryId;
 	}
 </script>
 
@@ -263,9 +272,9 @@
 										<div class="flex items-center gap-2">
 											<span class="text-lg">{getCategoryIcon(transaction.category)}</span>
 											<div>
-												<p class="text-sm font-medium">{transactionCategories[transaction.category].label}</p>
+												<p class="text-sm font-medium">{transaction.category === 'income' ? 'Income' : transaction.category === 'expense' ? 'Expense' : 'Transfer'}</p>
 												<p class="text-xs text-muted-foreground">
-													{availableTypes[transaction.type] || transaction.type}
+													{transaction.type}
 												</p>
 											</div>
 										</div>
@@ -301,7 +310,7 @@
 			<div class="space-y-2">
 				<Label class="text-sm font-medium text-gray-700">Transaction Type</Label>
 				<div class="grid grid-cols-3 gap-3">
-					{#each Object.entries(transactionCategories) as [value, { label, icon }]}
+					{#each [['income', '💰', 'Income'], ['expense', '💸', 'Expense'], ['transfer', '🔄', 'Transfer']] as [value, icon, label]}
 						<button
 							type="button"
 							onclick={() => formData.category = value}
@@ -358,9 +367,11 @@
 						id="type"
 						bind:value={formData.type}
 						class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+						required
 					>
-						{#each Object.entries(availableTypes) as [value, label]}
-							<option {value}>{label}</option>
+						<option value="">Select category</option>
+						{#each availableCategories as category}
+							<option value={category.id}>{category.label}</option>
 						{/each}
 					</select>
 				</div>
@@ -528,7 +539,7 @@
 						'bg-blue-600 hover:bg-blue-700'
 					}"
 				>
-					Add {transactionCategories[formData.category].label}
+					Add {formData.category === 'income' ? 'Income' : formData.category === 'expense' ? 'Expense' : 'Transfer'}
 				</Button>
 			</Dialog.Footer>
 		</form>
