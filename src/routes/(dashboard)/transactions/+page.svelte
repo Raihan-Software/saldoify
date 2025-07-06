@@ -49,7 +49,7 @@
 	
 	// Form state
 	let formData = $state({
-		date: new Date().toISOString().split('T')[0],
+		date: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
 		description: '',
 		category: 'expense' as Transaction['category'],
 		type: 'food',
@@ -137,7 +137,7 @@
 		
 		// Reset form
 		formData = {
-			date: new Date().toISOString().split('T')[0],
+			date: new Date().toISOString().slice(0, 16),
 			description: '',
 			category: 'expense',
 			type: 'food',
@@ -338,11 +338,11 @@
 				<div class="space-y-2">
 					<Label for="date" class="flex items-center gap-2 text-sm font-medium text-gray-700">
 						<Calendar class="w-4 h-4" />
-						Date
+						Date & Time
 					</Label>
 					<Input
 						id="date"
-						type="date"
+						type="datetime-local"
 						bind:value={formData.date}
 						class="h-11"
 						required
