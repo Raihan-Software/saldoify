@@ -57,9 +57,23 @@
 		net: data.monthlyTotals.income - data.monthlyTotals.expense
 	});
 	
+	// Format date for datetime-local input (preserving local timezone)
+	function formatDateForInput(date: Date | string): string {
+		const dateObj = typeof date === 'string' ? new Date(date) : date;
+		
+		// Get local date components
+		const year = dateObj.getFullYear();
+		const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+		const day = String(dateObj.getDate()).padStart(2, '0');
+		const hours = String(dateObj.getHours()).padStart(2, '0');
+		const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+		
+		return `${year}-${month}-${day}T${hours}:${minutes}`;
+	}
+	
 	// Form state
 	let formData = $state({
-		date: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDTHH:MM
+		date: formatDateForInput(new Date()), // Format: YYYY-MM-DDTHH:MM in local timezone
 		description: '',
 		category: 'expense' as 'income' | 'expense' | 'transfer',
 		type: '',
@@ -146,7 +160,7 @@
 	
 	function resetForm() {
 		formData = {
-			date: new Date().toISOString().slice(0, 16),
+			date: formatDateForInput(new Date()),
 			description: '',
 			category: 'expense',
 			type: '',
@@ -318,7 +332,7 @@
 												<DropdownMenu.Item onclick={() => {
 													editingTransaction = transaction;
 													formData = {
-														date: new Date(transaction.transactionDate).toISOString().slice(0, 16),
+														date: formatDateForInput(transaction.transactionDate),
 														description: transaction.description,
 														category: transaction.type as 'income' | 'expense' | 'transfer',
 														type: transaction.category?.id || '',
