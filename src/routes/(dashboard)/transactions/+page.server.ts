@@ -55,9 +55,7 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		// Handle datetime-local input with timezone preservation
-		const localDateString = data.get('transactionDate') as string;
-		const transactionDate = parseDateTimeWithTimezone(localDateString);
+		const transactionDate = new Date(new Date(data.get('transactionDate') as string).toISOString());
 		const notes = data.get('notes') as string;
 		
 		// Handle transfers separately
@@ -144,9 +142,7 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		// Handle datetime-local input with timezone preservation
-		const localDateString = data.get('transactionDate') as string;
-		const transactionDate = parseDateTimeWithTimezone(localDateString);
+		const transactionDate = new Date(new Date(data.get('transactionDate') as string).toISOString());
 		const notes = data.get('notes') as string;
 		
 		// Validate required fields
