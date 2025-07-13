@@ -47,21 +47,17 @@ export const actions = {
 		const dateTimeString = data.get('transactionDate') as string;
 		const clientTimezoneOffset = parseInt(data.get('timezoneOffset') as string) || 0;
 		
-		// The datetime-local input is in the user's local time
-		// But when we create a Date on the server, it's interpreted in server's timezone
-		// We need to adjust for this difference
+		// Convert timezone offset to ISO format (e.g., -420 becomes "+07:00")
+		const offsetHours = Math.floor(Math.abs(clientTimezoneOffset) / 60);
+		const offsetMinutes = Math.abs(clientTimezoneOffset) % 60;
+		const offsetSign = clientTimezoneOffset <= 0 ? '+' : '-';
+		const isoOffset = `${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes.toString().padStart(2, '0')}`;
 		
-		// Create date (will be interpreted in server timezone)
-		const serverDate = new Date(dateTimeString);
+		// Append timezone to make it a proper ISO string
+		const isoDateString = `${dateTimeString}:00${isoOffset}`;
 		
-		// Get server's timezone offset
-		const serverTimezoneOffset = serverDate.getTimezoneOffset();
-		
-		// Calculate the difference between server and client timezones
-		const offsetDiff = serverTimezoneOffset - clientTimezoneOffset;
-		
-		// Adjust the date by the timezone difference
-		const transactionDate = new Date(serverDate.getTime() + (offsetDiff * 60 * 1000));
+		// Parse with timezone information
+		const transactionDate = new Date(isoDateString);
 		const notes = data.get('notes') as string;
 		
 		// Handle transfers separately
@@ -152,21 +148,17 @@ export const actions = {
 		const dateTimeString = data.get('transactionDate') as string;
 		const clientTimezoneOffset = parseInt(data.get('timezoneOffset') as string) || 0;
 		
-		// The datetime-local input is in the user's local time
-		// But when we create a Date on the server, it's interpreted in server's timezone
-		// We need to adjust for this difference
+		// Convert timezone offset to ISO format (e.g., -420 becomes "+07:00")
+		const offsetHours = Math.floor(Math.abs(clientTimezoneOffset) / 60);
+		const offsetMinutes = Math.abs(clientTimezoneOffset) % 60;
+		const offsetSign = clientTimezoneOffset <= 0 ? '+' : '-';
+		const isoOffset = `${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes.toString().padStart(2, '0')}`;
 		
-		// Create date (will be interpreted in server timezone)
-		const serverDate = new Date(dateTimeString);
+		// Append timezone to make it a proper ISO string
+		const isoDateString = `${dateTimeString}:00${isoOffset}`;
 		
-		// Get server's timezone offset
-		const serverTimezoneOffset = serverDate.getTimezoneOffset();
-		
-		// Calculate the difference between server and client timezones
-		const offsetDiff = serverTimezoneOffset - clientTimezoneOffset;
-		
-		// Adjust the date by the timezone difference
-		const transactionDate = new Date(serverDate.getTime() + (offsetDiff * 60 * 1000));
+		// Parse with timezone information
+		const transactionDate = new Date(isoDateString);
 		const notes = data.get('notes') as string;
 		
 		// Validate required fields
