@@ -43,8 +43,15 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		// 2025-07-13T12:51
-		const transactionDate = parseISO(data.get('transactionDate') as string);
+		// Convert string to Date object and ensure UTC format
+		const localDateString = data.get('transactionDate') as string;
+		// Create a Date object from the local datetime string
+		// The datetime-local input provides local time, so we need to convert to UTC
+		const localDate = new Date(localDateString);
+		// Convert to UTC by getting the timezone offset and adjusting
+		// getTimezoneOffset() returns minutes, positive for timezones behind UTC
+		const timezoneOffset = localDate.getTimezoneOffset() * 60000; // Convert minutes to milliseconds
+		const transactionDate = new Date(localDate.getTime() - timezoneOffset);
 		const notes = data.get('notes') as string;
 		
 		// Handle transfers separately
@@ -131,8 +138,15 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		// Handle datetime-local input
-		const transactionDate = parseISO(data.get('transactionDate') as string);
+		// Handle datetime-local input and convert to UTC
+		const localDateString = data.get('transactionDate') as string;
+		// Create a Date object from the local datetime string
+		// The datetime-local input provides local time, so we need to convert to UTC
+		const localDate = new Date(localDateString);
+		// Convert to UTC by getting the timezone offset and adjusting
+		// getTimezoneOffset() returns minutes, positive for timezones behind UTC
+		const timezoneOffset = localDate.getTimezoneOffset() * 60000; // Convert minutes to milliseconds
+		const transactionDate = new Date(localDate.getTime() - timezoneOffset);
 		const notes = data.get('notes') as string;
 		
 		// Validate required fields
