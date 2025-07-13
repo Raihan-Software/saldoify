@@ -9,24 +9,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw new Error('Not authenticated');
 	}
 
-	// Fetch liquid assets for account dropdowns
-	const liquidAssets = await getUserAssetsByType(locals.user.id, 'liquid');
-	
-	// Fetch transaction categories
-	const transactionCategories = await getUserTransactionCategories(locals.user.id);
-	
-	// Fetch user transactions
-	const transactions = await getUserTransactions(locals.user.id);
-	
-	// Get current month summary
 	const now = new Date();
-	const monthlyTotals = await getMonthlyTransactionSummary(locals.user.id, now.getFullYear(), now.getMonth() + 1);
 	
 	return {
-		liquidAssets,
-		transactionCategories,
-		transactions,
-		monthlyTotals
+		// Return promises for async loading
+		liquidAssets: getUserAssetsByType(locals.user.id, 'liquid'),
+		transactionCategories: getUserTransactionCategories(locals.user.id),
+		transactions: getUserTransactions(locals.user.id),
+		monthlyTotals: getMonthlyTransactionSummary(locals.user.id, now.getFullYear(), now.getMonth() + 1)
 	};
 };
 

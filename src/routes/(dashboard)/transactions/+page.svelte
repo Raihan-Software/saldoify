@@ -2,19 +2,18 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
 	import { Button } from '$lib/components/ui/button';
-	import { Badge } from '$lib/components/ui/badge';
 	import { Plus, TrendingUp, TrendingDown, Activity, Calendar, Wallet, ArrowRightLeft, FileText, Hash, CreditCard, MoreVertical, Edit, Trash2 } from '@lucide/svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import PageHeader from '$lib/components/page-header.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	import { format, isToday, isYesterday } from 'date-fns';
 	import { id } from 'date-fns/locale';
-	import { parseDateTime, toCalendarDateTime, getLocalTimeZone, ZonedDateTime } from '@internationalized/date';
 	
 	let { data }: { data: PageData } = $props();
 
@@ -26,10 +25,10 @@
 	let deletingTransaction = $state<any>(null);
 	
 	// Group transactions by date
-	let groupedTransactions = $derived.by(() => {
-		const groups: Record<string, typeof data.transactions> = {};
+	function groupTransactionsByDate(transactions: any[]) {
+		const groups: Record<string, any[]> = {};
 		
-		data.transactions.forEach(transaction => {
+		transactions.forEach(transaction => {
 			const date = new Date(transaction.transactionDate);
 			const dateKey = date.toDateString();
 			
@@ -40,10 +39,10 @@
 		});
 		
 		return groups;
-	});
+	}
 	
 	// Calculate daily totals
-	function calculateDailyTotal(transactions: typeof data.transactions, type: 'income' | 'expense' | 'all' = 'all') {
+	function calculateDailyTotal(transactions: any[], type: 'income' | 'expense' | 'all' = 'all') {
 		return transactions.reduce((total, t) => {
 			const amount = parseFloat(t.amount);
 			if (type === 'all') {
@@ -53,12 +52,6 @@
 		}, 0);
 	}
 	
-	// Use monthly totals from server
-	let monthlyTotals = $derived({
-		income: data.monthlyTotals.income,
-		expense: data.monthlyTotals.expense,
-		net: data.monthlyTotals.income - data.monthlyTotals.expense
-	});
 	
 	// Format date for datetime-local input with proper timezone handling
 	function formatDateForInput(date: Date | string): string {
@@ -90,21 +83,6 @@
 		notes: ''
 	});
 	
-	// Get available accounts from database
-	const availableAccounts = $derived(data.liquidAssets.map(asset => ({
-		id: asset.id,
-		name: asset.name,
-		institution: asset.bankName,
-		balance: parseFloat(asset.currentValue)
-	})));
-	
-	// Get available categories based on transaction type
-	let availableCategories = $derived(
-		formData.category === 'income' ? data.transactionCategories.income :
-		formData.category === 'expense' ? data.transactionCategories.expense :
-		formData.category === 'transfer' ? data.transactionCategories.transfer :
-		[]
-	);
 	
 	// Dynamic placeholders based on category
 	let descriptionPlaceholder = $derived(
@@ -114,18 +92,14 @@
 		'Enter description'
 	);
 	
-	// Reset type when category changes
+	// Clear transfer fields when changing category
 	$effect(() => {
-		// Set first available category when transaction type changes
-		if (availableCategories.length > 0 && !availableCategories.find(cat => cat.id === formData.type)) {
-			formData.type = availableCategories[0].id;
-		}
-		// Clear transfer-specific fields when switching away from transfer
 		if (formData.category !== 'transfer') {
 			formData.fromAccount = '';
 			formData.toAccount = '';
 		}
 	});
+	
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('id-ID', {
@@ -180,19 +154,7 @@
 		return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 	}
 	
-	function getAccountName(accountId: string): string {
-		const account = availableAccounts.find(a => a.id === accountId);
-		return account ? account.name : accountId;
-	}
 	
-	function getCategoryName(categoryId: string, type: string): string {
-		const categories = type === 'income' ? data.transactionCategories.income :
-															 type === 'expense' ? data.transactionCategories.expense :
-															 type === 'transfer' ? data.transactionCategories.transfer :
-															 [];
-		const category = categories.find(c => c.id === categoryId);
-		return category ? category.label : categoryId;
-	}
 </script>
 
 <div class="p-8 space-y-6">
@@ -206,173 +168,241 @@
 	/>
 
 	<!-- Summary Cards -->
-	<div class="grid gap-4 md:grid-cols-3">
-		<!-- Monthly Income Card -->
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Monthly Income</CardTitle>
-				<TrendingUp class="h-4 w-4 text-green-600" />
-			</CardHeader>
-			<CardContent>
-				<div class="text-2xl font-bold text-green-600">{formatCurrency(monthlyTotals.income)}</div>
-				<p class="text-xs text-muted-foreground mt-1">
-					This month's total income
-				</p>
-			</CardContent>
-		</Card>
+	{#await data.monthlyTotals}
+		<!-- Loading skeleton for summary cards -->
+		<div class="grid gap-4 md:grid-cols-3">
+			{#each Array(3) as _}
+				<Card>
+					<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+						<Skeleton class="h-4 w-24" />
+						<Skeleton class="h-4 w-4 rounded-full" />
+					</CardHeader>
+					<CardContent>
+						<Skeleton class="h-8 w-32 mb-1" />
+						<Skeleton class="h-3 w-28" />
+					</CardContent>
+				</Card>
+			{/each}
+		</div>
+	{:then monthlyTotals}
+		<div class="grid gap-4 md:grid-cols-3">
+			<!-- Monthly Income Card -->
+			<Card>
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+					<CardTitle class="text-sm font-medium">Monthly Income</CardTitle>
+					<TrendingUp class="h-4 w-4 text-green-600" />
+				</CardHeader>
+				<CardContent>
+					<div class="text-2xl font-bold text-green-600">{formatCurrency(monthlyTotals.income)}</div>
+					<p class="text-xs text-muted-foreground mt-1">
+						This month's total income
+					</p>
+				</CardContent>
+			</Card>
 
-		<!-- Monthly Expense Card -->
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Monthly Expenses</CardTitle>
-				<TrendingDown class="h-4 w-4 text-red-600" />
-			</CardHeader>
-			<CardContent>
-				<div class="text-2xl font-bold text-red-600">{formatCurrency(monthlyTotals.expense)}</div>
-				<p class="text-xs text-muted-foreground mt-1">
-					This month's total expenses
-				</p>
-			</CardContent>
-		</Card>
+			<!-- Monthly Expense Card -->
+			<Card>
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+					<CardTitle class="text-sm font-medium">Monthly Expenses</CardTitle>
+					<TrendingDown class="h-4 w-4 text-red-600" />
+				</CardHeader>
+				<CardContent>
+					<div class="text-2xl font-bold text-red-600">{formatCurrency(monthlyTotals.expense)}</div>
+					<p class="text-xs text-muted-foreground mt-1">
+						This month's total expenses
+					</p>
+				</CardContent>
+			</Card>
 
-		<!-- Net Card -->
-		<Card>
-			<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<CardTitle class="text-sm font-medium">Net Cash Flow</CardTitle>
-				<Activity class="h-4 w-4 text-muted-foreground" />
-			</CardHeader>
-			<CardContent>
-				<div class="text-2xl font-bold {monthlyTotals.net >= 0 ? 'text-green-600' : 'text-red-600'}">
-					{formatCurrency(monthlyTotals.net)}
-				</div>
-				<p class="text-xs text-muted-foreground mt-1">
-					Income minus expenses
-				</p>
-			</CardContent>
-		</Card>
-	</div>
+			<!-- Net Card -->
+			<Card>
+				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+					<CardTitle class="text-sm font-medium">Net Cash Flow</CardTitle>
+					<Activity class="h-4 w-4 text-muted-foreground" />
+				</CardHeader>
+				<CardContent>
+					<div class="text-2xl font-bold {monthlyTotals.income - monthlyTotals.expense >= 0 ? 'text-green-600' : 'text-red-600'}">
+						{formatCurrency(monthlyTotals.income - monthlyTotals.expense)}
+					</div>
+					<p class="text-xs text-muted-foreground mt-1">
+						Income minus expenses
+					</p>
+				</CardContent>
+			</Card>
+		</div>
+	{/await}
 
 	<!-- Transactions by Day -->
-	<div class="space-y-6">
-		{#if Object.keys(groupedTransactions).length === 0}
-			<Card>
-				<CardContent class="py-12 text-center">
-					<p class="text-muted-foreground">No transactions yet. Add your first transaction!</p>
-				</CardContent>
-			</Card>
-		{:else}
-			{#each Object.entries(groupedTransactions) as [dateKey, dayTransactions]}
-			<Card>
-				<CardHeader class="pb-4">
-					<div class="flex items-center justify-between">
-						<CardTitle class="text-lg">{formatDate(dateKey)}</CardTitle>
-						<div class="flex items-center gap-4 text-sm">
-							<span class="text-green-600">+{formatCurrency(calculateDailyTotal(dayTransactions, 'income'))}</span>
-							<span class="text-red-600">-{formatCurrency(calculateDailyTotal(dayTransactions, 'expense'))}</span>
-							<span class="font-medium {calculateDailyTotal(dayTransactions) >= 0 ? 'text-green-600' : 'text-red-600'}">
-								{calculateDailyTotal(dayTransactions) >= 0 ? '+' : ''}{formatCurrency(calculateDailyTotal(dayTransactions))}
-							</span>
+	{#await data.transactions}
+		<!-- Loading skeleton for transactions -->
+		<div class="space-y-6">
+			{#each Array(2) as _}
+				<Card>
+					<CardHeader class="pb-4">
+						<div class="flex items-center justify-between">
+							<Skeleton class="h-6 w-32" />
+							<div class="flex items-center gap-4">
+								<Skeleton class="h-4 w-20" />
+								<Skeleton class="h-4 w-20" />
+								<Skeleton class="h-4 w-24" />
+							</div>
 						</div>
-					</div>
-				</CardHeader>
-				<CardContent class="pt-0">
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead class="w-[100px]">Time</TableHead>
-								<TableHead>Description</TableHead>
-								<TableHead>Category</TableHead>
-								<TableHead>Account</TableHead>
-								<TableHead class="text-right">Amount</TableHead>
-								<TableHead class="w-[50px]"></TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{#each dayTransactions as transaction}
-								<TableRow>
-									<TableCell class="text-muted-foreground">
-										{formatTime(transaction.transactionDate)}
-									</TableCell>
-									<TableCell class="font-medium">
-										{transaction.description}
-										{#if transaction.notes}
-											<p class="text-xs text-muted-foreground">{transaction.notes}</p>
-										{/if}
-									</TableCell>
-									<TableCell>
-										<div class="flex items-center gap-2">
-											<span class="text-lg">{transaction.type === 'income' ? '💰' : '💸'}</span>
-											<div>
-												<p class="text-sm font-medium">{transaction.type === 'income' ? 'Income' : 'Expense'}</p>
-												<p class="text-xs text-muted-foreground">
-													{transaction.category?.label || '-'}
-												</p>
-											</div>
-										</div>
-									</TableCell>
-									<TableCell>
+					</CardHeader>
+					<CardContent class="pt-0">
+						<div class="space-y-3">
+							{#each Array(3) as _}
+								<div class="flex items-center justify-between p-3 rounded-lg">
+									<div class="flex items-center gap-3">
+										<Skeleton class="w-10 h-10 rounded-full" />
 										<div>
-											<p class="text-sm">{transaction.account?.name || '-'}</p>
-											{#if transaction.account?.bankName}
-												<p class="text-xs text-muted-foreground">{transaction.account.bankName}</p>
-											{/if}
+											<Skeleton class="h-4 w-32 mb-1" />
+											<Skeleton class="h-3 w-20" />
 										</div>
-									</TableCell>
-									<TableCell class="text-right">
-										<span class="font-medium {transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}">
-											{transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
-										</span>
-									</TableCell>
-									<TableCell>
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger>
-												<Button variant="ghost" class="h-8 w-8 p-0">
-													<span class="sr-only">Open menu</span>
-													<MoreVertical class="h-4 w-4" />
-												</Button>
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Content align="end">
-												<DropdownMenu.Item onclick={() => {
-													editingTransaction = transaction;
-													formData = {
-														date: formatDateForInput(transaction.transactionDate),
-														description: transaction.description,
-														category: transaction.type as 'income' | 'expense' | 'transfer',
-														type: transaction.category?.id || '',
-														amount: transaction.amount,
-														account: transaction.account?.id || '',
-														fromAccount: '',
-														toAccount: '',
-														notes: transaction.notes || ''
-													};
-													showEditModal = true;
-												}}>
-													<Edit class="mr-2 h-4 w-4" />
-													<span>Edit</span>
-												</DropdownMenu.Item>
-												<DropdownMenu.Separator />
-												<DropdownMenu.Item class="text-red-600" onclick={() => {
-													deletingTransaction = transaction;
-													showDeleteModal = true;
-												}}>
-													<Trash2 class="mr-2 h-4 w-4" />
-													<span>Delete</span>
-												</DropdownMenu.Item>
-											</DropdownMenu.Content>
-										</DropdownMenu.Root>
-									</TableCell>
-								</TableRow>
+									</div>
+									<div class="text-right">
+										<Skeleton class="h-5 w-24 mb-1" />
+										<Skeleton class="h-3 w-16" />
+									</div>
+								</div>
 							{/each}
-						</TableBody>
-					</Table>
-				</CardContent>
-			</Card>
+						</div>
+					</CardContent>
+				</Card>
 			{/each}
-		{/if}
-	</div>
+		</div>
+	{:then transactions}
+		{@const groupedTransactions = groupTransactionsByDate(transactions)}
+		<div class="space-y-6">
+			{#if Object.keys(groupedTransactions).length === 0}
+				<Card>
+					<CardContent class="py-12 text-center">
+						<p class="text-muted-foreground">No transactions yet. Add your first transaction!</p>
+					</CardContent>
+				</Card>
+			{:else}
+				{#each Object.entries(groupedTransactions) as [dateKey, dayTransactions]}
+				<Card>
+					<CardHeader class="pb-4">
+						<div class="flex items-center justify-between">
+							<CardTitle class="text-lg">{formatDate(dateKey)}</CardTitle>
+							<div class="flex items-center gap-4 text-sm">
+								<span class="text-green-600">+{formatCurrency(calculateDailyTotal(dayTransactions, 'income'))}</span>
+								<span class="text-red-600">-{formatCurrency(calculateDailyTotal(dayTransactions, 'expense'))}</span>
+								<span class="font-medium {calculateDailyTotal(dayTransactions) >= 0 ? 'text-green-600' : 'text-red-600'}">
+									{calculateDailyTotal(dayTransactions) >= 0 ? '+' : ''}{formatCurrency(calculateDailyTotal(dayTransactions))}
+								</span>
+							</div>
+						</div>
+					</CardHeader>
+					<CardContent class="pt-0">
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead class="w-[100px]">Time</TableHead>
+									<TableHead>Description</TableHead>
+									<TableHead>Category</TableHead>
+									<TableHead>Account</TableHead>
+									<TableHead class="text-right">Amount</TableHead>
+									<TableHead class="w-[50px]"></TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{#each dayTransactions as transaction}
+									<TableRow>
+										<TableCell class="text-muted-foreground">
+											{formatTime(transaction.transactionDate)}
+										</TableCell>
+										<TableCell class="font-medium">
+											{transaction.description}
+											{#if transaction.notes}
+												<p class="text-xs text-muted-foreground">{transaction.notes}</p>
+											{/if}
+										</TableCell>
+										<TableCell>
+											<div class="flex items-center gap-2">
+												<span class="text-lg">{transaction.type === 'income' ? '💰' : '💸'}</span>
+												<div>
+													<p class="text-sm font-medium">{transaction.type === 'income' ? 'Income' : 'Expense'}</p>
+													<p class="text-xs text-muted-foreground">
+														{transaction.category?.label || '-'}
+													</p>
+												</div>
+											</div>
+										</TableCell>
+										<TableCell>
+											<div>
+												<p class="text-sm">{transaction.account?.name || '-'}</p>
+												{#if transaction.account?.bankName}
+													<p class="text-xs text-muted-foreground">{transaction.account.bankName}</p>
+												{/if}
+											</div>
+										</TableCell>
+										<TableCell class="text-right">
+											<span class="font-medium {transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}">
+												{transaction.type === 'income' ? '+' : '-'}{formatCurrency(parseFloat(transaction.amount))}
+											</span>
+										</TableCell>
+										<TableCell>
+											<DropdownMenu.Root>
+												<DropdownMenu.Trigger>
+													<Button variant="ghost" class="h-8 w-8 p-0">
+														<span class="sr-only">Open menu</span>
+														<MoreVertical class="h-4 w-4" />
+													</Button>
+												</DropdownMenu.Trigger>
+												<DropdownMenu.Content align="end">
+													<DropdownMenu.Item onclick={() => {
+														editingTransaction = transaction;
+														formData = {
+															date: formatDateForInput(transaction.transactionDate),
+															description: transaction.description,
+															category: transaction.type as 'income' | 'expense' | 'transfer',
+															type: transaction.category?.id || '',
+															amount: transaction.amount,
+															account: transaction.account?.id || '',
+															fromAccount: '',
+															toAccount: '',
+															notes: transaction.notes || ''
+														};
+														showEditModal = true;
+													}}>
+														<Edit class="mr-2 h-4 w-4" />
+														<span>Edit</span>
+													</DropdownMenu.Item>
+													<DropdownMenu.Separator />
+													<DropdownMenu.Item class="text-red-600" onclick={() => {
+														deletingTransaction = transaction;
+														showDeleteModal = true;
+													}}>
+														<Trash2 class="mr-2 h-4 w-4" />
+														<span>Delete</span>
+													</DropdownMenu.Item>
+												</DropdownMenu.Content>
+											</DropdownMenu.Root>
+										</TableCell>
+									</TableRow>
+								{/each}
+							</TableBody>
+						</Table>
+					</CardContent>
+				</Card>
+				{/each}
+			{/if}
+		</div>
+	{/await}
 </div>
 
-<!-- Add Transaction Modal -->
+{#await Promise.all([data.liquidAssets, data.transactionCategories])}
+	<!-- Loading state - don't show modals while data is loading -->
+{:then [liquidAssets, transactionCategories]}
+	{@const availableAccounts = liquidAssets.map(asset => ({
+		id: asset.id,
+		name: asset.name,
+		institution: asset.bankName,
+		balance: parseFloat(asset.currentValue)
+	}))}
+
+	<!-- Add Transaction Modal -->
 <Dialog.Root bind:open={showAddModal}>
 	<Dialog.Content class="sm:max-w-[600px]">
 		<Dialog.Header>
@@ -406,7 +436,7 @@
 					{#each [['income', '💰', 'Income'], ['expense', '💸', 'Expense'], ['transfer', '🔄', 'Transfer']] as [value, icon, label]}
 						<button
 							type="button"
-							onclick={() => formData.category = value}
+							onclick={() => formData.category = value as 'income' | 'expense' | 'transfer'}
 							class="relative p-4 rounded-lg border-2 transition-all duration-200 {
 								formData.category === value 
 									? value === 'income' ? 'border-green-500 bg-green-50' 
@@ -467,7 +497,7 @@
 						required
 					>
 						<option value="">Select category</option>
-						{#each availableCategories as category}
+						{#each (formData.category === 'income' ? transactionCategories.income : formData.category === 'expense' ? transactionCategories.expense : formData.category === 'transfer' ? transactionCategories.transfer : []) as category}
 							<option value={category.id}>{category.label}</option>
 						{/each}
 					</select>
@@ -528,7 +558,7 @@
 							name="assetId"
 							bind:value={formData.account}
 							class="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-							required={formData.category !== 'transfer'}
+							required={formData.category !== 'transfer' as any}
 						>
 							<option value="">Select account</option>
 							{#each availableAccounts as account}
@@ -599,7 +629,7 @@
 					placeholder="Add any additional details..."
 					bind:value={formData.notes}
 					class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-				/>
+				></textarea>
 			</div>
 			
 			<!-- Transaction Summary -->
@@ -619,11 +649,11 @@
 					</div>
 					{#if formData.category === 'transfer' && formData.fromAccount && formData.toAccount}
 						<div class="text-xs text-gray-500">
-							{getAccountName(formData.fromAccount)} → {getAccountName(formData.toAccount)}
+							{formData.fromAccount} → {formData.toAccount}
 						</div>
 					{:else if formData.account}
 						<div class="text-xs text-gray-500">
-							From: {getAccountName(formData.account)}
+							From: {formData.account}
 						</div>
 					{/if}
 				</div>
@@ -636,11 +666,11 @@
 				<Button 
 					type="submit" 
 					disabled={isSubmitting}
-					class="{
+					class={
 						formData.category === 'income' ? 'bg-green-600 hover:bg-green-700' : 
 						formData.category === 'expense' ? 'bg-red-600 hover:bg-red-700' : 
 						'bg-blue-600 hover:bg-blue-700'
-					}"
+					}
 				>
 					{isSubmitting ? 'Adding...' : `Add ${formData.category === 'income' ? 'Income' : formData.category === 'expense' ? 'Expense' : 'Transfer'}`}
 				</Button>
@@ -686,7 +716,7 @@
 					{#each [['income', '💰', 'Income'], ['expense', '💸', 'Expense']] as [value, icon, label]}
 						<button
 							type="button"
-							onclick={() => formData.category = value}
+							onclick={() => formData.category = value as 'income' | 'expense' | 'transfer'}
 							class="relative p-4 rounded-lg border-2 transition-all duration-200 {
 								formData.category === value 
 									? value === 'income' ? 'border-green-500 bg-green-50' 
@@ -744,7 +774,7 @@
 						required
 					>
 						<option value="">Select category</option>
-						{#each availableCategories as category}
+						{#each (formData.category === 'income' ? transactionCategories.income : formData.category === 'expense' ? transactionCategories.expense : formData.category === 'transfer' ? transactionCategories.transfer : []) as category}
 							<option value={category.id}>{category.label}</option>
 						{/each}
 					</select>
@@ -911,3 +941,4 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+{/await}
