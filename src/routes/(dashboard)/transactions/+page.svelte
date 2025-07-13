@@ -720,7 +720,7 @@
 					<Input
 						id="edit-date"
 						name="transactionDate"
-						type="datetime-local"
+						type="datetime"
 						bind:value={formData.date}
 						class="h-11"
 						required
