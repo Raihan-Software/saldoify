@@ -3,6 +3,7 @@ import { getUserAssetsByType } from '$lib/server/assets';
 import { getUserTransactionCategories } from '$lib/server/transaction-categories';
 import { getUserTransactions, createTransaction, updateTransaction, deleteTransaction, getMonthlyTransactionSummary } from '$lib/server/transactions';
 import { fail } from '@sveltejs/kit';
+import { parseISO } from 'date-fns';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) {
@@ -42,8 +43,8 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		// Handle datetime-local input
-		const transactionDate = new Date(data.get('transactionDate') as string);
+		// 2025-07-13T12:51
+		const transactionDate = parseISO(data.get('transactionDate') as string);
 		const notes = data.get('notes') as string;
 		
 		// Handle transfers separately
@@ -131,7 +132,7 @@ export const actions = {
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
 		// Handle datetime-local input
-		const transactionDate = new Date(data.get('transactionDate') as string);
+		const transactionDate = parseISO(data.get('transactionDate') as string);
 		const notes = data.get('notes') as string;
 		
 		// Validate required fields
