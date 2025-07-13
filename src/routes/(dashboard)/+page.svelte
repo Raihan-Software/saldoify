@@ -10,6 +10,8 @@
 	} from '@lucide/svelte';
 	import type { PageData } from './$types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { format, isToday, isYesterday } from 'date-fns';
+	import { id } from 'date-fns/locale';
 	
 	let { data }: { data: PageData } = $props();
 	
@@ -57,17 +59,11 @@
 	}
 	
 	function formatDate(date: Date): string {
-		const today = new Date();
-		const yesterday = new Date(today);
-		yesterday.setDate(yesterday.getDate() - 1);
+		if (isToday(date)) return 'Today';
+		if (isYesterday(date)) return 'Yesterday';
 		
-		if (date.toDateString() === today.toDateString()) return 'Today';
-		if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-		
-		return new Intl.DateTimeFormat('id-ID', {
-			month: 'short',
-			day: 'numeric'
-		}).format(date);
+		// Format date in Indonesian locale
+		return format(date, 'd MMM', { locale: id });
 	}
 </script>
 

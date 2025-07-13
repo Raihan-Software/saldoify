@@ -12,6 +12,8 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
+	import { format, isToday, isYesterday } from 'date-fns';
+	import { id } from 'date-fns/locale';
 	
 	let { data }: { data: PageData } = $props();
 
@@ -132,29 +134,18 @@
 
 	function formatTime(date: Date | string): string {
 		const dateObj = typeof date === 'string' ? new Date(date) : date;
-		return new Intl.DateTimeFormat('id-ID', {
-			hour: '2-digit',
-			minute: '2-digit'
-		}).format(dateObj);
+		return format(dateObj, 'HH:mm', { locale: id });
 	}
 	
 	function formatDate(date: Date | string): string {
 		const dateObj = typeof date === 'string' ? new Date(date) : date;
-		const today = new Date();
-		const yesterday = new Date(today);
-		yesterday.setDate(yesterday.getDate() - 1);
 		
-		if (dateObj.toDateString() === today.toDateString()) {
+		if (isToday(dateObj)) {
 			return 'Today';
-		} else if (dateObj.toDateString() === yesterday.toDateString()) {
+		} else if (isYesterday(dateObj)) {
 			return 'Yesterday';
 		} else {
-			return new Intl.DateTimeFormat('id-ID', {
-				weekday: 'long',
-				day: 'numeric',
-				month: 'long',
-				year: 'numeric'
-			}).format(dateObj);
+			return format(dateObj, 'EEEE, d MMMM yyyy', { locale: id });
 		}
 	}
 	
