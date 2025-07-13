@@ -14,6 +14,7 @@
 	import type { PageData } from './$types';
 	import { format, isToday, isYesterday } from 'date-fns';
 	import { id } from 'date-fns/locale';
+	import { parseDateTime, toCalendarDateTime, getLocalTimeZone, ZonedDateTime } from '@internationalized/date';
 	
 	let { data }: { data: PageData } = $props();
 
@@ -59,14 +60,21 @@
 		net: data.monthlyTotals.income - data.monthlyTotals.expense
 	});
 	
-	// Format date for datetime-local input using date-fns
+	// Format date for datetime-local input with proper timezone handling
 	function formatDateForInput(date: Date | string): string {
 		if (!date) return '';
 		
 		const dateObj = typeof date === 'string' ? new Date(date) : date;
 		
-		// Format as YYYY-MM-DDTHH:mm for datetime-local input
-		return format(dateObj, "yyyy-MM-dd'T'HH:mm");
+		// Simply format the date object in local time
+		// The Date object already handles timezone conversion when displaying
+		const year = dateObj.getFullYear();
+		const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+		const day = String(dateObj.getDate()).padStart(2, '0');
+		const hour = String(dateObj.getHours()).padStart(2, '0');
+		const minute = String(dateObj.getMinutes()).padStart(2, '0');
+		
+		return `${year}-${month}-${day}T${hour}:${minute}`;
 	}
 	
 	// Form state
@@ -129,9 +137,16 @@
 	}
 
 	function formatTime(date: Date | string): string {
+		// Use Intl.DateTimeFormat for consistent timezone handling
 		const dateObj = typeof date === 'string' ? new Date(date) : date;
-		// Format in local time
-		return format(dateObj, 'HH:mm', { locale: id });
+		
+		// Format time in user's locale and timezone
+		return new Intl.DateTimeFormat('id-ID', {
+			hour: '2-digit',
+			minute: '2-digit',
+			hour12: false
+			// No explicit timezone - uses user's local timezone
+		}).format(dateObj);
 	}
 	
 	function formatDate(date: Date | string): string {

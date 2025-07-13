@@ -62,8 +62,11 @@
 		if (isToday(date)) return 'Today';
 		if (isYesterday(date)) return 'Yesterday';
 		
-		// Format date in Indonesian locale
-		return format(date, 'd MMM', { locale: id });
+		// Use Intl.DateTimeFormat for consistent formatting
+		return new Intl.DateTimeFormat('id-ID', {
+			day: 'numeric',
+			month: 'short'
+		}).format(date);
 	}
 </script>
 

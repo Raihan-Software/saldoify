@@ -42,6 +42,7 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
+		// Handle datetime-local input
 		const transactionDate = new Date(data.get('transactionDate') as string);
 		const notes = data.get('notes') as string;
 		
@@ -129,6 +130,7 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
+		// Handle datetime-local input
 		const transactionDate = new Date(data.get('transactionDate') as string);
 		const notes = data.get('notes') as string;
 		
