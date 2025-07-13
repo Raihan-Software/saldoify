@@ -59,18 +59,14 @@
 		net: data.monthlyTotals.income - data.monthlyTotals.expense
 	});
 	
-	// Format date for datetime-local input (preserving local timezone)
+	// Format date for datetime-local input using date-fns
 	function formatDateForInput(date: Date | string): string {
+		if (!date) return '';
+		
 		const dateObj = typeof date === 'string' ? new Date(date) : date;
 		
-		// Get local date components
-		const year = dateObj.getFullYear();
-		const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-		const day = String(dateObj.getDate()).padStart(2, '0');
-		const hours = String(dateObj.getHours()).padStart(2, '0');
-		const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-		
-		return `${year}-${month}-${day}T${hours}:${minutes}`;
+		// Format as YYYY-MM-DDTHH:mm for datetime-local input
+		return format(dateObj, "yyyy-MM-dd'T'HH:mm");
 	}
 	
 	// Form state
@@ -134,6 +130,7 @@
 
 	function formatTime(date: Date | string): string {
 		const dateObj = typeof date === 'string' ? new Date(date) : date;
+		// Format in local time
 		return format(dateObj, 'HH:mm', { locale: id });
 	}
 	
