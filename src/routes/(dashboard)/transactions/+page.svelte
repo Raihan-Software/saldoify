@@ -450,6 +450,8 @@
 						class="h-11"
 						required
 					/>
+					<!-- Hidden field to send timezone offset -->
+					<input type="hidden" name="timezoneOffset" value={new Date().getTimezoneOffset()} />
 				</div>
 				
 				<div class="space-y-2">
@@ -720,11 +722,13 @@
 					<Input
 						id="edit-date"
 						name="transactionDate"
-						type="datetime"
+						type="datetime-local"
 						bind:value={formData.date}
 						class="h-11"
 						required
 					/>
+					<!-- Hidden field to send timezone offset -->
+					<input type="hidden" name="timezoneOffset" value={new Date().getTimezoneOffset()} />
 				</div>
 				
 				<div class="space-y-2">

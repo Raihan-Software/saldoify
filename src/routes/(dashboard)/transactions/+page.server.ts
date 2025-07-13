@@ -3,7 +3,6 @@ import { getUserAssetsByType } from '$lib/server/assets';
 import { getUserTransactionCategories } from '$lib/server/transaction-categories';
 import { getUserTransactions, createTransaction, updateTransaction, deleteTransaction, getMonthlyTransactionSummary } from '$lib/server/transactions';
 import { fail } from '@sveltejs/kit';
-import { parseDateTime, getLocalTimeZone, toZoned } from '@internationalized/date';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) {
@@ -31,17 +30,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 	};
 };
 
-// Helper function to convert datetime-local input to timezone-aware date
-function parseDateTimeWithTimezone(dateTimeString: string): Date {
-	// Parse the datetime-local input (which is in local timezone)
-	const localDateTime = parseDateTime(dateTimeString);
-	
-	// Convert to zoned datetime with the user's local timezone
-	const zonedDateTime = toZoned(localDateTime, getLocalTimeZone());
-	
-	// Convert to JavaScript Date object
-	return zonedDateTime.toDate();
-}
 
 export const actions = {
 	create: async ({ request, locals }) => {
@@ -55,7 +43,25 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		const transactionDate = new Date(new Date(data.get('transactionDate') as string).toISOString());
+		// Parse datetime-local input which comes as "YYYY-MM-DDTHH:mm"
+		const dateTimeString = data.get('transactionDate') as string;
+		const clientTimezoneOffset = parseInt(data.get('timezoneOffset') as string) || 0;
+		
+		// The datetime-local input is in the user's local time
+		// But when we create a Date on the server, it's interpreted in server's timezone
+		// We need to adjust for this difference
+		
+		// Create date (will be interpreted in server timezone)
+		const serverDate = new Date(dateTimeString);
+		
+		// Get server's timezone offset
+		const serverTimezoneOffset = serverDate.getTimezoneOffset();
+		
+		// Calculate the difference between server and client timezones
+		const offsetDiff = serverTimezoneOffset - clientTimezoneOffset;
+		
+		// Adjust the date by the timezone difference
+		const transactionDate = new Date(serverDate.getTime() + (offsetDiff * 60 * 1000));
 		const notes = data.get('notes') as string;
 		
 		// Handle transfers separately
@@ -142,7 +148,25 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		const transactionDate = new Date(new Date(data.get('transactionDate') as string).toISOString());
+		// Parse datetime-local input which comes as "YYYY-MM-DDTHH:mm"
+		const dateTimeString = data.get('transactionDate') as string;
+		const clientTimezoneOffset = parseInt(data.get('timezoneOffset') as string) || 0;
+		
+		// The datetime-local input is in the user's local time
+		// But when we create a Date on the server, it's interpreted in server's timezone
+		// We need to adjust for this difference
+		
+		// Create date (will be interpreted in server timezone)
+		const serverDate = new Date(dateTimeString);
+		
+		// Get server's timezone offset
+		const serverTimezoneOffset = serverDate.getTimezoneOffset();
+		
+		// Calculate the difference between server and client timezones
+		const offsetDiff = serverTimezoneOffset - clientTimezoneOffset;
+		
+		// Adjust the date by the timezone difference
+		const transactionDate = new Date(serverDate.getTime() + (offsetDiff * 60 * 1000));
 		const notes = data.get('notes') as string;
 		
 		// Validate required fields
