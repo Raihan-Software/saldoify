@@ -6,8 +6,8 @@ export const user = pgTable('user', {
 	name: text('name').notNull(),
 	username: text('username').unique(), // Made optional for backward compatibility
 	passwordHash: text('password_hash').notNull(),
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 export const session = pgTable('session', {
@@ -15,7 +15,7 @@ export const session = pgTable('session', {
 	userId: text('user_id')
 		.notNull()
 		.references(() => user.id),
-	expiresAt: timestamp('expires_at', { withTimezone: false, mode: 'date' }).notNull()
+	expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull()
 });
 
 export const passwordResetToken = pgTable('password_reset_token', {
@@ -25,8 +25,8 @@ export const passwordResetToken = pgTable('password_reset_token', {
 		.references(() => user.id),
 	email: text('email').notNull(),
 	token: text('token').notNull().unique(),
-	expiresAt: timestamp('expires_at', { withTimezone: false, mode: 'date' }).notNull(),
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 export const currencies = pgTable('currencies', {
@@ -52,8 +52,8 @@ export const userPreferences = pgTable('user_preferences', {
 	numberFormat: text('number_format').notNull().default('1.234.567,89'), // Number Format dropdown
 	compactNumbers: boolean('compact_numbers').notNull().default(false), // Compact Numbers toggle
 	
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 // Debt types table
@@ -65,8 +65,8 @@ export const debtTypes = pgTable('debt_types', {
 	label: text('label').notNull(),
 	icon: text('icon').notNull(),
 	isSystem: boolean('is_system').notNull().default(false), // For default types
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 // Asset types table
@@ -79,8 +79,8 @@ export const assetTypes = pgTable('asset_types', {
 	label: text('label').notNull(),
 	icon: text('icon').notNull(),
 	isSystem: boolean('is_system').notNull().default(false),
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 // Transaction categories table
@@ -92,8 +92,8 @@ export const transactionCategories = pgTable('transaction_categories', {
 	type: text('type').notNull(), // 'income', 'expense', 'transfer'
 	label: text('label').notNull(),
 	isSystem: boolean('is_system').notNull().default(false),
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 // Assets table
@@ -112,7 +112,7 @@ export const assets = pgTable('assets', {
 	// Financial data
 	currentValue: decimal('current_value', { precision: 15, scale: 2 }).notNull(),
 	purchaseValue: decimal('purchase_value', { precision: 15, scale: 2 }),
-	purchaseDate: timestamp('purchase_date', { withTimezone: false, mode: 'date' }),
+	purchaseDate: timestamp('purchase_date', { withTimezone: true, mode: 'date' }),
 	
 	// Additional fields based on type
 	// For liquid assets
@@ -129,8 +129,8 @@ export const assets = pgTable('assets', {
 	
 	// Metadata
 	notes: text('notes'),
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 // Debts table
@@ -151,15 +151,15 @@ export const debts = pgTable('debts', {
 	monthlyPayment: decimal('monthly_payment', { precision: 15, scale: 2 }), // Fixed monthly payment amount
 	
 	// Dates
-	startDate: timestamp('start_date', { withTimezone: false, mode: 'date' }),
-	dueDate: timestamp('due_date', { withTimezone: false, mode: 'date' }),
+	startDate: timestamp('start_date', { withTimezone: true, mode: 'date' }),
+	dueDate: timestamp('due_date', { withTimezone: true, mode: 'date' }),
 	
 	// Additional info
 	notes: text('notes'),
 	
 	// Metadata
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 // Transactions table
@@ -177,14 +177,14 @@ export const transactions = pgTable('transactions', {
 	assetId: text('asset_id').notNull().references(() => assets.id), // The liquid asset account
 	
 	// Date and time
-	transactionDate: timestamp('transaction_date', { withTimezone: false, mode: 'date' }).notNull(),
+	transactionDate: timestamp('transaction_date', { withTimezone: true, mode: 'date' }).notNull(),
 	
 	// Additional info
 	notes: text('notes'),
 	
 	// Metadata
-	createdAt: timestamp('created_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull(),
-	updatedAt: timestamp('updated_at', { withTimezone: false, mode: 'date' }).defaultNow().notNull()
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).defaultNow().notNull()
 });
 
 export type Session = typeof session.$inferSelect;
