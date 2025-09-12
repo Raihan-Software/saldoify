@@ -1,12 +1,15 @@
 node_modules
+# Frontend
+/frontend/node_modules
 
 # Output
 .output
 .vercel
 .netlify
 .wrangler
-/.svelte-kit
-/build
+frontend/.svelte-kit
+frontend/build
+dist
 
 # OS
 .DS_Store
@@ -17,7 +20,11 @@ Thumbs.db
 .env.*
 !.env.example
 !.env.test
+frontend/.env
 
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Frontend
+frontend/vite.config.ts.timestamp-*
