@@ -1,15 +1,20 @@
 import type { PageServerLoad, Actions } from './$types';
-import { 
-	getMockAssetsByType, 
-	mockTransactionCategories, 
+import {
+	getMockAssetsByType,
+	mockTransactionCategories,
 	mockTransactions,
 	getMockMonthlyTransactionSummary
 } from '$lib/mock-data';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+	// Check if user is authenticated
+	if (!locals.user) {
+		// Redirect to login page if not authenticated
+		throw redirect(302, '/login');
+	}
 	const now = new Date();
-	
+
 	return {
 		liquidAssets: getMockAssetsByType('liquid'),
 		transactionCategories: mockTransactionCategories,
@@ -28,52 +33,52 @@ export const actions = {
 		const assetId = data.get('assetId') as string;
 		const dateTimeString = data.get('transactionDate') as string;
 		const clientTimezoneOffset = parseInt(data.get('timezoneOffset') as string) || 0;
-		
+
 		// Convert timezone offset to ISO format (e.g., -420 becomes "+07:00")
 		const offsetHours = Math.floor(Math.abs(clientTimezoneOffset) / 60);
 		const offsetMinutes = Math.abs(clientTimezoneOffset) % 60;
 		const offsetSign = clientTimezoneOffset <= 0 ? '+' : '-';
 		const isoOffset = `${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes.toString().padStart(2, '0')}`;
-		
+
 		// Append timezone to make it a proper ISO string
 		const isoDateString = `${dateTimeString}:00${isoOffset}`;
-		
+
 		// Parse with timezone information
 		const transactionDate = new Date(isoDateString);
 		const notes = data.get('notes') as string;
-		
+
 		// Handle transfers separately
 		if (type === 'transfer') {
 			const fromAccountId = data.get('fromAccount') as string;
 			const toAccountId = data.get('toAccount') as string;
-			
+
 			if (!fromAccountId || !toAccountId) {
 				return fail(400, { message: 'Transfer requires both source and destination accounts' });
 			}
-			
+
 			if (fromAccountId === toAccountId) {
 				return fail(400, { message: 'Cannot transfer to the same account' });
 			}
-			
+
 			// Validate other required fields
 			if (!categoryId || !description || !amount || !transactionDate) {
 				return fail(400, { message: 'Missing required fields' });
 			}
-			
+
 			// Mock success response
 			return { success: true };
 		}
-		
+
 		// Regular income/expense transaction
 		// Validate required fields
 		if (!type || !categoryId || !description || !amount || !assetId || !transactionDate) {
 			return fail(400, { message: 'Missing required fields' });
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	},
-	
+
 	update: async ({ request }) => {
 		const data = await request.formData();
 		const id = data.get('id') as string;
@@ -84,37 +89,37 @@ export const actions = {
 		const assetId = data.get('assetId') as string;
 		const dateTimeString = data.get('transactionDate') as string;
 		const clientTimezoneOffset = parseInt(data.get('timezoneOffset') as string) || 0;
-		
+
 		// Convert timezone offset to ISO format (e.g., -420 becomes "+07:00")
 		const offsetHours = Math.floor(Math.abs(clientTimezoneOffset) / 60);
 		const offsetMinutes = Math.abs(clientTimezoneOffset) % 60;
 		const offsetSign = clientTimezoneOffset <= 0 ? '+' : '-';
 		const isoOffset = `${offsetSign}${offsetHours.toString().padStart(2, '0')}:${offsetMinutes.toString().padStart(2, '0')}`;
-		
+
 		// Append timezone to make it a proper ISO string
 		const isoDateString = `${dateTimeString}:00${isoOffset}`;
-		
+
 		// Parse with timezone information
 		const transactionDate = new Date(isoDateString);
 		const notes = data.get('notes') as string;
-		
+
 		// Validate required fields
 		if (!id || !type || !categoryId || !description || !amount || !assetId || !transactionDate) {
 			return fail(400, { message: 'Missing required fields' });
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	},
-	
+
 	delete: async ({ request }) => {
 		const data = await request.formData();
 		const id = data.get('id') as string;
-		
+
 		if (!id) {
 			return fail(400, { message: 'Missing transaction ID' });
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	}

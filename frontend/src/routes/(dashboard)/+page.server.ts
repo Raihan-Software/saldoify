@@ -1,8 +1,9 @@
 import type { PageServerLoad } from './$types';
-import { 
-	getMockAssetsByType, 
-	getMockAssetSummaryByType, 
-	getMockDebts, 
+import { redirect } from '@sveltejs/kit';
+import {
+	getMockAssetsByType,
+	getMockAssetSummaryByType,
+	getMockDebts,
 	getMockDebtSummary,
 	getMockRecentTransactions,
 	getMockTopSpendingCategories,
@@ -10,10 +11,15 @@ import {
 	mockUserPreferences
 } from '$lib/mock-data';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+	// Check if user is authenticated
+	if (!locals.user) {
+		// Redirect to login page if not authenticated
+		throw redirect(302, '/login');
+	}
 	const now = new Date();
 	const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-	
+
 	return {
 		preferences: mockUserPreferences,
 		dashboardData: loadDashboardData(now, startOfMonth)
@@ -33,17 +39,17 @@ function loadDashboardData(now: Date, startOfMonth: Date) {
 	const recentTransactions = getMockRecentTransactions(10);
 	const monthlyTotals = getMockMonthlyTransactionSummary(now.getFullYear(), now.getMonth() + 1);
 	const topCategories = getMockTopSpendingCategories(now.getFullYear(), now.getMonth() + 1, 5);
-	
+
 	// Calculate net worth data
 	const totalAssets = liquidSummary.totalValue + nonLiquidSummary.totalValue + investmentSummary.totalValue;
 	const totalLiabilities = debtSummary.totalDebt;
 	const netWorth = totalAssets - totalLiabilities;
-	
+
 	// Calculate savings rate
-	const savingsRate = monthlyTotals.income > 0 
-		? ((monthlyTotals.income - monthlyTotals.expense) / monthlyTotals.income) * 100 
+	const savingsRate = monthlyTotals.income > 0
+		? ((monthlyTotals.income - monthlyTotals.expense) / monthlyTotals.income) * 100
 		: 0;
-	
+
 	return {
 		netWorthData: {
 			assets: {

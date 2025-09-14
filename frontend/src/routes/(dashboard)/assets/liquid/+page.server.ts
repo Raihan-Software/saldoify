@@ -1,9 +1,9 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
-import { 
-	getMockAssetsByType, 
-	getMockAssetSummaryByType, 
+import {
+	getMockAssetsByType,
+	getMockAssetSummaryByType,
 	mockAssetTypes,
 	mockUserPreferences
 } from '$lib/mock-data';
@@ -18,7 +18,12 @@ const liquidAssetSchema = z.object({
 	notes: z.string().optional()
 });
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+	// Check if user is authenticated
+	if (!locals.user) {
+		// Redirect to login page if not authenticated
+		throw redirect(302, '/login');
+	}
 	return {
 		assets: getMockAssetsByType('liquid'),
 		liquidAssetTypes: mockAssetTypes.liquid,
@@ -39,28 +44,28 @@ export const actions = {
 			bankName: formData.get('bankName')?.toString() || undefined,
 			notes: formData.get('notes')?.toString() || undefined
 		};
-		
+
 		const result = liquidAssetSchema.safeParse(data);
 		if (!result.success) {
 			return fail(400, {
 				error: result.error.flatten().fieldErrors
 			});
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	},
-	
+
 	update: async ({ request }) => {
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
-		
+
 		if (!id) {
 			return fail(400, {
 				error: 'Missing asset ID'
 			});
 		}
-		
+
 		const data = {
 			name: formData.get('name')?.toString() || '',
 			description: formData.get('description')?.toString() || undefined,
@@ -69,30 +74,30 @@ export const actions = {
 			bankName: formData.get('bankName')?.toString() || undefined,
 			notes: formData.get('notes')?.toString() || undefined
 		};
-		
+
 		const partialSchema = liquidAssetSchema.omit({ assetTypeId: true });
 		const result = partialSchema.safeParse(data);
-		
+
 		if (!result.success) {
 			return fail(400, {
 				error: result.error.flatten().fieldErrors
 			});
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	},
-	
+
 	delete: async ({ request }) => {
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
-		
+
 		if (!id) {
 			return fail(400, {
 				error: 'Missing asset ID'
 			});
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	}

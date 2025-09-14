@@ -1,8 +1,13 @@
 import type { PageServerLoad, Actions } from './$types';
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { getMockDebts, mockDebtTypes } from '$lib/mock-data';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+	// Check if user is authenticated
+	if (!locals.user) {
+		// Redirect to login page if not authenticated
+		throw redirect(302, '/login');
+	}
 	return {
 		debts: getMockDebts(),
 		debtTypes: mockDebtTypes
@@ -21,16 +26,16 @@ export const actions: Actions = {
 		const startDate = data.get('startDate') ? new Date(data.get('startDate') as string) : undefined;
 		const dueDate = data.get('dueDate') ? new Date(data.get('dueDate') as string) : undefined;
 		const notes = data.get('notes') as string;
-		
+
 		// Validate required fields
 		if (!name || !debtTypeId || !balance) {
 			return fail(400, { message: 'Missing required fields' });
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	},
-	
+
 	update: async ({ request }) => {
 		const data = await request.formData();
 		const id = data.get('id') as string;
@@ -43,24 +48,24 @@ export const actions: Actions = {
 		const startDate = data.get('startDate') ? new Date(data.get('startDate') as string) : undefined;
 		const dueDate = data.get('dueDate') ? new Date(data.get('dueDate') as string) : undefined;
 		const notes = data.get('notes') as string;
-		
+
 		// Validate required fields
 		if (!id || !name || !debtTypeId || !balance) {
 			return fail(400, { message: 'Missing required fields' });
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	},
-	
+
 	delete: async ({ request }) => {
 		const data = await request.formData();
 		const id = data.get('id') as string;
-		
+
 		if (!id) {
 			return fail(400, { message: 'Missing debt ID' });
 		}
-		
+
 		// Mock success response
 		return { success: true };
 	}
