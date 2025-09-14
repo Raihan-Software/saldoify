@@ -7,26 +7,89 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/raihan-software/saldoify/docs"
+	"github.com/raihan-software/saldoify/internal/database"
+	"github.com/raihan-software/saldoify/internal/handler"
+	authMiddleware "github.com/raihan-software/saldoify/internal/middleware"
+	"github.com/raihan-software/saldoify/internal/repository"
+	"github.com/raihan-software/saldoify/internal/service"
+	"github.com/raihan-software/saldoify/internal/utils"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
+// @title Saldoify API
+// @version 1.0
+// @description A personal finance management API
+// @host localhost:8080
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
+	// Initialize database
+	if err := database.InitDB(); err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	defer database.CloseDB()
+
+	// Initialize Echo
 	app := echo.New()
 
+	// Custom validator
+	app.Validator = utils.NewValidator()
+
+	// Middleware
 	app.Use(middleware.Recover())
 	app.Use(middleware.Logger())
 	app.Use(middleware.Secure())
 	app.Use(middleware.CORS())
 
+	// Initialize dependencies
+	userRepo := repository.NewUserRepository()
+	jwtSecret := getEnv("JWT_SECRET", "your-secret-key")
+	userService := service.NewUserService(userRepo, jwtSecret)
+	userHandler := handler.NewUserHandler(userService)
+
+	// Swagger documentation
+	docs.SwaggerInfo.Host = getEnv("HOST", "localhost:8080")
+	app.GET("/swagger/*", echoSwagger.WrapHandler)
+
+	// Health check
 	app.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	// API routes
+	api := app.Group("/api/v1")
+
+	// Public routes (no authentication required)
+	api.POST("/users/register", userHandler.Register)
+	api.POST("/users/login", userHandler.Login)
+
+	// Protected routes (authentication required)
+	protected := api.Group("")
+	protected.Use(authMiddleware.AuthMiddleware(userService))
+
+	protected.GET("/users/profile", userHandler.GetProfile)
+	protected.GET("/users/:id", userHandler.GetUser)
+	protected.PUT("/users/:id", userHandler.UpdateUser)
+	protected.DELETE("/users/:id", userHandler.DeleteUser)
+	protected.GET("/users", userHandler.ListUsers)
+
+	// Start server
+	port := getEnv("PORT", "8080")
+	log.Printf("Server starting on port %s", port)
+	log.Printf("Swagger documentation available at http://localhost:%s/swagger/index.html", port)
 
 	if err := app.Start(":" + port); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+// getEnv gets an environment variable with a fallback default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

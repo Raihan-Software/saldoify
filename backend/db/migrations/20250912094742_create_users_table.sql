@@ -1,6 +1,6 @@
 -- migrate:up
 CREATE TABLE users (
-    id VARCHAR(32) PRIMARY KEY,
+    id VARCHAR(36) PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
     username VARCHAR(255) UNIQUE,

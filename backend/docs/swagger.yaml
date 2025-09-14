@@ -1,0 +1,367 @@
+swagger: "2.0"
+info:
+  description: "A personal finance management API"
+  title: "Saldoify API"
+  version: "1.0"
+host: "localhost:8080"
+basePath: "/api/v1"
+schemes:
+  - "http"
+  - "https"
+securityDefinitions:
+  BearerAuth:
+    type: apiKey
+    name: Authorization
+    in: header
+paths:
+  /users/register:
+    post:
+      tags:
+        - users
+      summary: Register a new user
+      description: Create a new user account
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: user
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/CreateUserRequest"
+      responses:
+        201:
+          description: User created successfully
+          schema:
+            $ref: "#/definitions/UserResponse"
+        400:
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        409:
+          description: Conflict
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        500:
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/login:
+    post:
+      tags:
+        - users
+      summary: User login
+      description: Authenticate user and return JWT token
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: credentials
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/LoginRequest"
+      responses:
+        200:
+          description: Login successful
+          schema:
+            $ref: "#/definitions/LoginResponse"
+        400:
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        401:
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        500:
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/profile:
+    get:
+      tags:
+        - users
+      summary: Get current user profile
+      description: Get the profile of the currently authenticated user
+      produces:
+        - application/json
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: User profile retrieved successfully
+          schema:
+            $ref: "#/definitions/UserResponse"
+        401:
+          description: Unauthorized
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        404:
+          description: User not found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        500:
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users/{id}:
+    get:
+      tags:
+        - users
+      summary: Get user by ID
+      description: Retrieve user information by ID
+      produces:
+        - application/json
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+          description: User ID
+      responses:
+        200:
+          description: User retrieved successfully
+          schema:
+            $ref: "#/definitions/UserResponse"
+        400:
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        404:
+          description: User not found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        500:
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    put:
+      tags:
+        - users
+      summary: Update user
+      description: Update user information
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+          description: User ID
+        - name: user
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/UpdateUserRequest"
+      responses:
+        200:
+          description: User updated successfully
+          schema:
+            $ref: "#/definitions/UserResponse"
+        400:
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        404:
+          description: User not found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        409:
+          description: Conflict
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        500:
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+    delete:
+      tags:
+        - users
+      summary: Delete user
+      description: Delete user account
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+          description: User ID
+      responses:
+        204:
+          description: User deleted successfully
+        400:
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        404:
+          description: User not found
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        500:
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+  /users:
+    get:
+      tags:
+        - users
+      summary: List users
+      description: Get a paginated list of users
+      produces:
+        - application/json
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          type: integer
+          description: Number of users to return (default: 10, max: 100)
+        - name: offset
+          in: query
+          type: integer
+          description: Number of users to skip (default: 0)
+      responses:
+        200:
+          description: Users retrieved successfully
+          schema:
+            type: object
+            properties:
+              users:
+                type: array
+                items:
+                  $ref: "#/definitions/UserResponse"
+              total:
+                type: integer
+              limit:
+                type: integer
+              offset:
+                type: integer
+        400:
+          description: Bad Request
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+        500:
+          description: Internal Server Error
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+definitions:
+  CreateUserRequest:
+    type: object
+    required:
+      - email
+      - name
+      - password
+    properties:
+      email:
+        type: string
+        format: email
+      name:
+        type: string
+        minLength: 2
+        maxLength: 100
+      username:
+        type: string
+        minLength: 3
+        maxLength: 50
+      password:
+        type: string
+        minLength: 6
+  UpdateUserRequest:
+    type: object
+    properties:
+      name:
+        type: string
+        minLength: 2
+        maxLength: 100
+      username:
+        type: string
+        minLength: 3
+        maxLength: 50
+  LoginRequest:
+    type: object
+    required:
+      - email
+      - password
+    properties:
+      email:
+        type: string
+        format: email
+      password:
+        type: string
+  UserResponse:
+    type: object
+    properties:
+      id:
+        type: string
+      email:
+        type: string
+        format: email
+      name:
+        type: string
+      username:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+  LoginResponse:
+    type: object
+    properties:
+      user:
+        $ref: "#/definitions/UserResponse"
+      token:
+        type: string

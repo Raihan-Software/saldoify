@@ -1,0 +1,4 @@
+-- migrate:up
+ALTER TABLE users ALTER COLUMN id TYPE VARCHAR(36);
+-- migrate:down
+ALTER TABLE users ALTER COLUMN id TYPE VARCHAR(32);
