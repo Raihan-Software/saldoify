@@ -1,11 +1,6 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
-import { verify } from '@node-rs/argon2';
-import { db } from '$lib/server/db';
-import * as table from '$lib/server/db/schema';
-import * as auth from '$lib/server/auth';
 
 const loginSchema = z.object({
 	email: z.string().email('Invalid email address'),
@@ -21,7 +16,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions = {
-	default: async ({ request, cookies }) => {
+	default: async ({ request }) => {
 		const formData = await request.formData();
 		const email = formData.get('email');
 		const password = formData.get('password');
@@ -39,38 +34,18 @@ export const actions = {
 			});
 		}
 
-		// Find user by email
-		const [user] = await db
-			.select()
-			.from(table.user)
-			.where(eq(table.user.email, result.data.email));
-
-		if (!user) {
-			return fail(400, {
-				email: result.data.email,
-				errors: {
-					general: 'Invalid email or password'
-				}
-			});
+		// Mock login - accept any email/password combination
+		// In a real app, you would validate against a database
+		if (result.data.email && result.data.password) {
+			// Redirect to dashboard
+			throw redirect(303, '/');
 		}
 
-		// Verify password
-		const isValidPassword = await verify(user.passwordHash, result.data.password);
-		if (!isValidPassword) {
-			return fail(400, {
-				email: result.data.email,
-				errors: {
-					general: 'Invalid email or password'
-				}
-			});
-		}
-
-		// Create session
-		const sessionToken = auth.generateSessionToken();
-		const session = await auth.createSession(sessionToken, user.id);
-		auth.setSessionTokenCookie({ cookies } as any, sessionToken, session.expiresAt);
-
-		// Redirect to dashboard
-		throw redirect(303, '/');
+		return fail(400, {
+			email: result.data.email,
+			errors: {
+				general: 'Invalid email or password'
+			}
+		});
 	}
 } satisfies Actions;

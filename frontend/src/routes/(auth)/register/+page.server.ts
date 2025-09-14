@@ -1,8 +1,6 @@
 import type { Actions } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
-import { createUser } from '$lib/server/user';
-import * as auth from '$lib/server/auth';
 
 const registerSchema = z.object({
 	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
@@ -28,59 +26,25 @@ export const actions = {
 			terms: formData.get('terms') === 'on'
 		};
 
-		try {
-			// Validate form data
-			const validated = registerSchema.parse(data);
-			
-			// Create user in database
-			const user = await createUser({
-				email: validated.email,
-				name: validated.name,
-				password: validated.password
+		// Validate input
+		const result = registerSchema.safeParse(data);
+		if (!result.success) {
+			const errors = result.error.flatten().fieldErrors;
+			return fail(400, {
+				name: data.name,
+				email: data.email,
+				errors: {
+					name: errors.name?.[0],
+					email: errors.email?.[0],
+					password: errors.password?.[0],
+					confirmPassword: errors.confirmPassword?.[0],
+					terms: errors.terms?.[0]
+				}
 			});
-			
-			// Create session for the new user
-			const sessionToken = auth.generateSessionToken();
-			const session = await auth.createSession(sessionToken, user.id);
-			auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
-			
-			// Redirect to dashboard
-			throw redirect(303, '/');
-			
-		} catch (error) {
-			// Handle validation errors
-			if (error instanceof z.ZodError) {
-				const errors: Record<string, string> = {};
-				error.errors.forEach((err) => {
-					if (err.path[0]) {
-						errors[err.path[0].toString()] = err.message;
-					}
-				});
-				
-				return fail(400, {
-					data: {
-						name: data.name,
-						email: data.email
-					},
-					errors
-				});
-			}
-			
-			// Handle user creation errors
-			if (error instanceof Error) {
-				return fail(400, {
-					data: {
-						name: data.name,
-						email: data.email
-					},
-					errors: {
-						general: error.message
-					}
-				});
-			}
-			
-			// Re-throw redirects
-			throw error;
 		}
+
+		// Mock registration - just redirect to login
+		// In a real app, you would create the user in the database
+		throw redirect(303, '/login?message=Registration successful. Please log in.');
 	}
 } satisfies Actions;

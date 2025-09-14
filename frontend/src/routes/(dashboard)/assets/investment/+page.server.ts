@@ -1,9 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
-import { getUserAssetsByType, createAsset, updateAsset, deleteAsset, getAssetSummaryByType } from '$lib/server/assets';
-import { getUserAssetTypes } from '$lib/server/asset-types';
-import { getUserPreferences } from '$lib/server/preferences';
+import { 
+	getMockAssetsByType, 
+	getMockAssetSummaryByType, 
+	mockAssetTypes,
+	mockUserPreferences
+} from '$lib/mock-data';
 
 const investmentAssetSchema = z.object({
 	assetTypeId: z.string().min(1, 'Asset type is required'),
@@ -17,32 +20,17 @@ const investmentAssetSchema = z.object({
 	notes: z.string().optional()
 });
 
-export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) {
-		throw new Error('Not authenticated');
-	}
-	
-	const [assets, assetTypes, summary, preferences] = await Promise.all([
-		getUserAssetsByType(locals.user.id, 'investment'),
-		getUserAssetTypes(locals.user.id),
-		getAssetSummaryByType(locals.user.id, 'investment'),
-		getUserPreferences(locals.user.id)
-	]);
-	
+export const load: PageServerLoad = async () => {
 	return {
-		assets,
-		investmentAssetTypes: assetTypes.investment,
-		summary,
-		preferences
+		assets: getMockAssetsByType('investment'),
+		investmentAssetTypes: mockAssetTypes.investment,
+		summary: getMockAssetSummaryByType('investment'),
+		preferences: mockUserPreferences
 	};
 };
 
 export const actions = {
-	create: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
+	create: async ({ request }) => {
 		const formData = await request.formData();
 		const data = {
 			assetTypeId: formData.get('assetTypeId')?.toString() || '',
@@ -63,28 +51,11 @@ export const actions = {
 			});
 		}
 		
-		try {
-			const assetData = {
-				type: 'investment' as const,
-				...result.data,
-				purchaseDate: result.data.purchaseDate ? new Date(result.data.purchaseDate) : undefined
-			};
-			
-			await createAsset(locals.user.id, assetData);
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to create investment asset:', error);
-			return fail(500, {
-				error: 'Failed to create asset'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	update: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
+	update: async ({ request }) => {
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
 		
@@ -114,27 +85,11 @@ export const actions = {
 			});
 		}
 		
-		try {
-			const updateData = {
-				...result.data,
-				purchaseDate: result.data.purchaseDate ? new Date(result.data.purchaseDate) : undefined
-			};
-			
-			await updateAsset(locals.user.id, id, updateData);
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to update investment asset:', error);
-			return fail(500, {
-				error: 'Failed to update asset'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	delete: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
+	delete: async ({ request }) => {
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
 		
@@ -144,14 +99,7 @@ export const actions = {
 			});
 		}
 		
-		try {
-			await deleteAsset(locals.user.id, id);
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to delete investment asset:', error);
-			return fail(500, {
-				error: 'Failed to delete asset'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	}
 } satisfies Actions;

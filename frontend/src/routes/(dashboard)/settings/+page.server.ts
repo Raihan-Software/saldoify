@@ -1,10 +1,14 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
-import { getUserPreferences, updateUserPreferences, commonCurrencies, numberFormats } from '$lib/server/preferences';
-import { getUserDebtTypes, createDebtType, updateDebtType, deleteDebtType } from '$lib/server/debt-types';
-import { getUserAssetTypes, createAssetType, updateAssetType, deleteAssetType } from '$lib/server/asset-types';
-import { getUserTransactionCategories, createTransactionCategory, updateTransactionCategory, deleteTransactionCategory } from '$lib/server/transaction-categories';
+import { 
+	mockUserPreferences, 
+	commonCurrencies, 
+	numberFormats,
+	mockDebtTypes,
+	mockAssetTypes,
+	mockTransactionCategories
+} from '$lib/mock-data';
 
 const updatePreferencesSchema = z.object({
 	currencyCode: z.string().optional(),
@@ -29,74 +33,39 @@ const transactionCategorySchema = z.object({
 	label: z.string().min(1, 'Label is required')
 });
 
-export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) {
-		throw new Error('Not authenticated');
-	}
-	
-	const preferences = await getUserPreferences(locals.user.id);
-	const debtTypes = await getUserDebtTypes(locals.user.id);
-	const assetTypes = await getUserAssetTypes(locals.user.id);
-	const transactionCategories = await getUserTransactionCategories(locals.user.id);
-	
+export const load: PageServerLoad = async () => {
 	return {
-		preferences,
+		preferences: mockUserPreferences,
 		currencies: commonCurrencies,
 		numberFormats,
-		debtTypes,
-		assetTypes,
-		transactionCategories
+		debtTypes: mockDebtTypes,
+		assetTypes: mockAssetTypes,
+		transactionCategories: mockTransactionCategories
 	};
 };
 
 export const actions = {
-	updatePreferences: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
+	updatePreferences: async ({ request }) => {
 		const formData = await request.formData();
-		const data: Record<string, any> = {};
+		const data = {
+			currencyCode: formData.get('currencyCode')?.toString(),
+			currencyDisplay: formData.get('currencyDisplay')?.toString() as 'symbol' | 'code' | 'both' | undefined,
+			numberFormat: formData.get('numberFormat')?.toString(),
+			compactNumbers: formData.get('compactNumbers') === 'true'
+		};
 		
-		// Process form data - get values from the select elements
-		const currency = formData.get('currency');
-		const currencyDisplay = formData.get('currency-display');
-		const numberFormat = formData.get('number-format');
-		const compactNumbers = formData.get('compact-numbers');
-		
-		if (currency) data.currencyCode = currency.toString();
-		if (currencyDisplay) data.currencyDisplay = currencyDisplay.toString();
-		if (numberFormat) data.numberFormat = numberFormat.toString();
-		data.compactNumbers = compactNumbers === 'on';
-		
-		// Validate the data
 		const result = updatePreferencesSchema.safeParse(data);
 		if (!result.success) {
 			return fail(400, {
-				error: 'Invalid form data'
+				error: result.error.flatten().fieldErrors
 			});
 		}
 		
-		try {
-			// Update preferences
-			await updateUserPreferences(locals.user.id, result.data);
-			
-			return {
-				success: true
-			};
-		} catch (error) {
-			console.error('Failed to update preferences:', error);
-			return fail(500, {
-				error: 'Failed to save settings'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	createDebtType: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
+	createDebtType: async ({ request }) => {
 		const formData = await request.formData();
 		const data = {
 			label: formData.get('label')?.toString() || '',
@@ -110,82 +79,50 @@ export const actions = {
 			});
 		}
 		
-		try {
-			await createDebtType(locals.user.id, result.data);
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to create debt type:', error);
-			return fail(500, {
-				error: 'Failed to create debt type'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	updateDebtType: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
-		const formData = await request.formData();
-		const id = formData.get('id')?.toString();
-		const label = formData.get('label')?.toString();
-		
-		if (!id || !label) {
-			return fail(400, {
-				error: 'Missing required fields'
-			});
-		}
-		
-		try {
-			await updateDebtType(locals.user.id, id, { label });
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to update debt type:', error);
-			return fail(500, {
-				error: 'Failed to update debt type'
-			});
-		}
-	},
-	
-	deleteDebtType: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
+	updateDebtType: async ({ request }) => {
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
 		
 		if (!id) {
+			return fail(400, { error: 'Missing debt type ID' });
+		}
+		
+		const data = {
+			label: formData.get('label')?.toString() || '',
+			icon: formData.get('icon')?.toString() || ''
+		};
+		
+		const result = debtTypeSchema.safeParse(data);
+		if (!result.success) {
 			return fail(400, {
-				error: 'Missing debt type ID'
+				error: result.error.flatten().fieldErrors
 			});
 		}
 		
-		try {
-			const deleted = await deleteDebtType(locals.user.id, id);
-			if (!deleted) {
-				return fail(400, {
-					error: 'Cannot delete system debt type'
-				});
-			}
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to delete debt type:', error);
-			return fail(500, {
-				error: 'Failed to delete debt type'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	// Asset Type Actions
-	createAssetType: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
+	deleteDebtType: async ({ request }) => {
+		const formData = await request.formData();
+		const id = formData.get('id')?.toString();
+		
+		if (!id) {
+			return fail(400, { error: 'Missing debt type ID' });
 		}
 		
+		// Mock success response
+		return { success: true };
+	},
+	
+	createAssetType: async ({ request }) => {
 		const formData = await request.formData();
 		const data = {
-			category: formData.get('category')?.toString() || '',
+			category: formData.get('category')?.toString() as 'liquid' | 'non_liquid' | 'investment' | undefined,
 			label: formData.get('label')?.toString() || '',
 			icon: formData.get('icon')?.toString() || ''
 		};
@@ -197,82 +134,52 @@ export const actions = {
 			});
 		}
 		
-		try {
-			await createAssetType(locals.user.id, result.data);
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to create asset type:', error);
-			return fail(500, {
-				error: 'Failed to create asset type'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	updateAssetType: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
-		const formData = await request.formData();
-		const id = formData.get('id')?.toString();
-		const label = formData.get('label')?.toString();
-		
-		if (!id || !label) {
-			return fail(400, {
-				error: 'Missing required fields'
-			});
-		}
-		
-		try {
-			await updateAssetType(locals.user.id, id, { label });
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to update asset type:', error);
-			return fail(500, {
-				error: 'Failed to update asset type'
-			});
-		}
-	},
-	
-	deleteAssetType: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
+	updateAssetType: async ({ request }) => {
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
 		
 		if (!id) {
+			return fail(400, { error: 'Missing asset type ID' });
+		}
+		
+		const data = {
+			label: formData.get('label')?.toString() || '',
+			icon: formData.get('icon')?.toString() || ''
+		};
+		
+		const partialSchema = assetTypeSchema.omit({ category: true });
+		const result = partialSchema.safeParse(data);
+		
+		if (!result.success) {
 			return fail(400, {
-				error: 'Missing asset type ID'
+				error: result.error.flatten().fieldErrors
 			});
 		}
 		
-		try {
-			const deleted = await deleteAssetType(locals.user.id, id);
-			if (!deleted) {
-				return fail(400, {
-					error: 'Cannot delete system asset type'
-				});
-			}
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to delete asset type:', error);
-			return fail(500, {
-				error: 'Failed to delete asset type'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	// Transaction Category Actions
-	createTransactionCategory: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
+	deleteAssetType: async ({ request }) => {
+		const formData = await request.formData();
+		const id = formData.get('id')?.toString();
+		
+		if (!id) {
+			return fail(400, { error: 'Missing asset type ID' });
 		}
 		
+		// Mock success response
+		return { success: true };
+	},
+	
+	createTransactionCategory: async ({ request }) => {
 		const formData = await request.formData();
 		const data = {
-			type: formData.get('type')?.toString() || '',
+			type: formData.get('type')?.toString() as 'income' | 'expense' | 'transfer' | undefined,
 			label: formData.get('label')?.toString() || ''
 		};
 		
@@ -283,70 +190,44 @@ export const actions = {
 			});
 		}
 		
-		try {
-			await createTransactionCategory(locals.user.id, result.data);
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to create transaction category:', error);
-			return fail(500, {
-				error: 'Failed to create transaction category'
-			});
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	updateTransactionCategory: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
-		const formData = await request.formData();
-		const id = formData.get('id')?.toString();
-		const label = formData.get('label')?.toString();
-		
-		if (!id || !label) {
-			return fail(400, {
-				error: 'Missing required fields'
-			});
-		}
-		
-		try {
-			await updateTransactionCategory(locals.user.id, id, { label });
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to update transaction category:', error);
-			return fail(500, {
-				error: 'Failed to update transaction category'
-			});
-		}
-	},
-	
-	deleteTransactionCategory: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { error: 'Not authenticated' });
-		}
-		
+	updateTransactionCategory: async ({ request }) => {
 		const formData = await request.formData();
 		const id = formData.get('id')?.toString();
 		
 		if (!id) {
+			return fail(400, { error: 'Missing transaction category ID' });
+		}
+		
+		const data = {
+			label: formData.get('label')?.toString() || ''
+		};
+		
+		const partialSchema = transactionCategorySchema.omit({ type: true });
+		const result = partialSchema.safeParse(data);
+		
+		if (!result.success) {
 			return fail(400, {
-				error: 'Missing transaction category ID'
+				error: result.error.flatten().fieldErrors
 			});
 		}
 		
-		try {
-			const deleted = await deleteTransactionCategory(locals.user.id, id);
-			if (!deleted) {
-				return fail(400, {
-					error: 'Cannot delete system transaction category'
-				});
-			}
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to delete transaction category:', error);
-			return fail(500, {
-				error: 'Failed to delete transaction category'
-			});
+		// Mock success response
+		return { success: true };
+	},
+	
+	deleteTransactionCategory: async ({ request }) => {
+		const formData = await request.formData();
+		const id = formData.get('id')?.toString();
+		
+		if (!id) {
+			return fail(400, { error: 'Missing transaction category ID' });
 		}
+		
+		// Mock success response
+		return { success: true };
 	}
 } satisfies Actions;

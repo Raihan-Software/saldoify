@@ -1,29 +1,24 @@
 import type { PageServerLoad } from './$types';
-import { getUserAssetsByType, getAssetSummaryByType } from '$lib/server/assets';
-import { getUserPreferences } from '$lib/server/preferences';
-import { getUserDebts, getDebtSummary } from '$lib/server/debts';
+import { 
+	getMockAssetsByType, 
+	getMockAssetSummaryByType, 
+	getMockDebts, 
+	getMockDebtSummary,
+	mockUserPreferences
+} from '$lib/mock-data';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) {
-		throw new Error('Not authenticated');
-	}
-	
-	// Get all asset types from the database
-	const [liquidAssets, nonLiquidAssets, investmentAssets, debts, preferences] = await Promise.all([
-		getUserAssetsByType(locals.user.id, 'liquid'),
-		getUserAssetsByType(locals.user.id, 'non_liquid'),
-		getUserAssetsByType(locals.user.id, 'investment'),
-		getUserDebts(locals.user.id),
-		getUserPreferences(locals.user.id)
-	]);
+export const load: PageServerLoad = async () => {
+	// Get all asset types from mock data
+	const liquidAssets = getMockAssetsByType('liquid');
+	const nonLiquidAssets = getMockAssetsByType('non_liquid');
+	const investmentAssets = getMockAssetsByType('investment');
+	const debts = getMockDebts();
 	
 	// Get summaries for each asset type and debts
-	const [liquidSummary, nonLiquidSummary, investmentSummary, debtSummary] = await Promise.all([
-		getAssetSummaryByType(locals.user.id, 'liquid'),
-		getAssetSummaryByType(locals.user.id, 'non_liquid'),
-		getAssetSummaryByType(locals.user.id, 'investment'),
-		getDebtSummary(locals.user.id)
-	]);
+	const liquidSummary = getMockAssetSummaryByType('liquid');
+	const nonLiquidSummary = getMockAssetSummaryByType('non_liquid');
+	const investmentSummary = getMockAssetSummaryByType('investment');
+	const debtSummary = getMockDebtSummary();
 	
 	return {
 		assets: {
@@ -38,6 +33,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 			investment: investmentSummary,
 			debt: debtSummary
 		},
-		preferences
+		preferences: mockUserPreferences
 	};
 };

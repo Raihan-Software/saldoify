@@ -1,39 +1,31 @@
 import type { PageServerLoad, Actions } from './$types';
-import { getUserAssetsByType } from '$lib/server/assets';
-import { getUserTransactionCategories } from '$lib/server/transaction-categories';
-import { getUserTransactions, createTransaction, updateTransaction, deleteTransaction, getMonthlyTransactionSummary } from '$lib/server/transactions';
+import { 
+	getMockAssetsByType, 
+	mockTransactionCategories, 
+	mockTransactions,
+	getMockMonthlyTransactionSummary
+} from '$lib/mock-data';
 import { fail } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) {
-		throw new Error('Not authenticated');
-	}
-
+export const load: PageServerLoad = async () => {
 	const now = new Date();
 	
 	return {
-		// Return promises for async loading
-		liquidAssets: getUserAssetsByType(locals.user.id, 'liquid'),
-		transactionCategories: getUserTransactionCategories(locals.user.id),
-		transactions: getUserTransactions(locals.user.id),
-		monthlyTotals: getMonthlyTransactionSummary(locals.user.id, now.getFullYear(), now.getMonth() + 1)
+		liquidAssets: getMockAssetsByType('liquid'),
+		transactionCategories: mockTransactionCategories,
+		transactions: mockTransactions,
+		monthlyTotals: getMockMonthlyTransactionSummary(now.getFullYear(), now.getMonth() + 1)
 	};
 };
 
-
 export const actions = {
-	create: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { message: 'Unauthorized' });
-		}
-		
+	create: async ({ request }) => {
 		const data = await request.formData();
 		const type = data.get('type') as 'income' | 'expense' | 'transfer';
 		const categoryId = data.get('categoryId') as string;
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		// Parse datetime-local input which comes as "YYYY-MM-DDTHH:mm"
 		const dateTimeString = data.get('transactionDate') as string;
 		const clientTimezoneOffset = parseInt(data.get('timezoneOffset') as string) || 0;
 		
@@ -68,34 +60,8 @@ export const actions = {
 				return fail(400, { message: 'Missing required fields' });
 			}
 			
-			try {
-				// Create expense transaction from source account
-				await createTransaction(locals.user.id, {
-					type: 'expense',
-					categoryId,
-					description: `Transfer out: ${description}`,
-					amount,
-					assetId: fromAccountId,
-					transactionDate,
-					notes: notes ? `Transfer to destination account. ${notes}` : 'Transfer to destination account'
-				});
-				
-				// Create income transaction to destination account
-				await createTransaction(locals.user.id, {
-					type: 'income',
-					categoryId,
-					description: `Transfer in: ${description}`,
-					amount,
-					assetId: toAccountId,
-					transactionDate,
-					notes: notes ? `Transfer from source account. ${notes}` : 'Transfer from source account'
-				});
-				
-				return { success: true };
-			} catch (error) {
-				console.error('Failed to create transfer:', error);
-				return fail(500, { message: 'Failed to create transfer' });
-			}
+			// Mock success response
+			return { success: true };
 		}
 		
 		// Regular income/expense transaction
@@ -104,29 +70,11 @@ export const actions = {
 			return fail(400, { message: 'Missing required fields' });
 		}
 		
-		try {
-			await createTransaction(locals.user.id, {
-				type: type as 'income' | 'expense',
-				categoryId,
-				description,
-				amount,
-				assetId,
-				transactionDate,
-				notes: notes || undefined
-			});
-			
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to create transaction:', error);
-			return fail(500, { message: 'Failed to create transaction' });
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	update: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { message: 'Unauthorized' });
-		}
-		
+	update: async ({ request }) => {
 		const data = await request.formData();
 		const id = data.get('id') as string;
 		const type = data.get('type') as 'income' | 'expense';
@@ -134,7 +82,6 @@ export const actions = {
 		const description = data.get('description') as string;
 		const amount = parseFloat(data.get('amount') as string);
 		const assetId = data.get('assetId') as string;
-		// Parse datetime-local input which comes as "YYYY-MM-DDTHH:mm"
 		const dateTimeString = data.get('transactionDate') as string;
 		const clientTimezoneOffset = parseInt(data.get('timezoneOffset') as string) || 0;
 		
@@ -156,29 +103,11 @@ export const actions = {
 			return fail(400, { message: 'Missing required fields' });
 		}
 		
-		try {
-			await updateTransaction(locals.user.id, id, {
-				type,
-				categoryId,
-				description,
-				amount,
-				assetId,
-				transactionDate,
-				notes: notes || undefined
-			});
-			
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to update transaction:', error);
-			return fail(500, { message: 'Failed to update transaction' });
-		}
+		// Mock success response
+		return { success: true };
 	},
 	
-	delete: async ({ request, locals }) => {
-		if (!locals.user) {
-			return fail(401, { message: 'Unauthorized' });
-		}
-		
+	delete: async ({ request }) => {
 		const data = await request.formData();
 		const id = data.get('id') as string;
 		
@@ -186,12 +115,7 @@ export const actions = {
 			return fail(400, { message: 'Missing transaction ID' });
 		}
 		
-		try {
-			await deleteTransaction(locals.user.id, id);
-			return { success: true };
-		} catch (error) {
-			console.error('Failed to delete transaction:', error);
-			return fail(500, { message: 'Failed to delete transaction' });
-		}
+		// Mock success response
+		return { success: true };
 	}
 } satisfies Actions;

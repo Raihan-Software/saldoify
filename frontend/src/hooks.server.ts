@@ -1,25 +1,22 @@
 import type { Handle } from '@sveltejs/kit';
-import * as auth from '$lib/server/auth';
 
 const handleAuth: Handle = async ({ event, resolve }) => {
-	const sessionToken = event.cookies.get(auth.sessionCookieName);
-
-	if (!sessionToken) {
-		event.locals.user = null;
-		event.locals.session = null;
-		return resolve(event);
-	}
-
-	const { session, user } = await auth.validateSessionToken(sessionToken);
-
-	if (session) {
-		auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
-	} else {
-		auth.deleteSessionTokenCookie(event);
-	}
-
-	event.locals.user = user;
-	event.locals.session = session;
+	// Mock user for development - always set a user
+	event.locals.user = {
+		id: 'mock-user-123',
+		email: 'demo@example.com',
+		name: 'Demo User',
+		username: 'demo',
+		passwordHash: 'mock-hash',
+		createdAt: new Date(),
+		updatedAt: new Date()
+	};
+	event.locals.session = {
+		id: 'mock-session-123',
+		userId: 'mock-user-123',
+		expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
+	};
+	
 	return resolve(event);
 };
 
