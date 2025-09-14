@@ -1,6 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
+import { apiClient } from '$lib/server/api';
+import { setSessionTokenCookie } from '$lib/server/auth.js';
 
 const loginSchema = z.object({
 	email: z.string().email('Invalid email address'),
@@ -16,7 +18,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions = {
-	default: async ({ request }) => {
+	default: async ({ request, cookies }) => {
 		const formData = await request.formData();
 		const email = formData.get('email');
 		const password = formData.get('password');
@@ -34,18 +36,41 @@ export const actions = {
 			});
 		}
 
-		// Mock login - accept any email/password combination
-		// In a real app, you would validate against a database
-		if (result.data.email && result.data.password) {
+		try {
+			// Call backend API to authenticate user
+			const loginResponse = await apiClient.login({
+				email: result.data.email,
+				password: result.data.password
+			});
+
+			// Set JWT token as session cookie
+			setSessionTokenCookie(
+				{ cookies } as any,
+				loginResponse.token
+			);
+
 			// Redirect to dashboard
 			throw redirect(303, '/');
-		}
-
-		return fail(400, {
-			email: result.data.email,
-			errors: {
-				general: 'Invalid email or password'
+		} catch (error) {
+			// Check if this is a redirect (which is expected behavior)
+			if (error && typeof error === 'object' && 'status' in error && error.status === 303) {
+				// This is a redirect, re-throw it
+				throw error;
 			}
-		});
+			
+			console.error('Login error:', error);
+			
+			let errorMessage = 'Login failed';
+			if (error instanceof Error) {
+				errorMessage = error.message;
+			}
+			
+			return fail(400, {
+				email: result.data.email,
+				errors: {
+					general: errorMessage
+				}
+			});
+		}
 	}
 } satisfies Actions;
