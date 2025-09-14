@@ -6,7 +6,20 @@ package db
 
 import (
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type LiquidAsset struct {
+	ID           string             `json:"id"`
+	UserID       string             `json:"user_id"`
+	AssetType    string             `json:"asset_type"`
+	Name         string             `json:"name"`
+	Description  *string            `json:"description"`
+	CurrentValue pgtype.Numeric     `json:"current_value"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
 
 type User struct {
 	ID           string    `json:"id"`

@@ -46,9 +46,12 @@ func main() {
 
 	// Initialize dependencies
 	userRepo := repository.NewUserRepository()
+	liquidAssetRepo := repository.NewLiquidAssetRepository()
 	jwtSecret := getEnv("JWT_SECRET", "your-secret-key")
 	userService := service.NewUserService(userRepo, jwtSecret)
+	liquidAssetService := service.NewLiquidAssetService(liquidAssetRepo)
 	userHandler := handler.NewUserHandler(userService)
+	liquidAssetHandler := handler.NewLiquidAssetHandler(liquidAssetService)
 
 	// Swagger documentation
 	docs.SwaggerInfo.Host = getEnv("HOST", "localhost:8080")
@@ -75,6 +78,15 @@ func main() {
 	protected.PUT("/users/:id", userHandler.UpdateUser)
 	protected.DELETE("/users/:id", userHandler.DeleteUser)
 	protected.GET("/users", userHandler.ListUsers)
+
+	// Liquid Assets routes
+	protected.POST("/liquid-assets", liquidAssetHandler.CreateAsset)
+	protected.GET("/liquid-assets", liquidAssetHandler.ListAssets)
+	protected.GET("/liquid-assets/total", liquidAssetHandler.GetTotalValue)
+	protected.GET("/liquid-assets/type/:type", liquidAssetHandler.GetAssetsByType)
+	protected.GET("/liquid-assets/:id", liquidAssetHandler.GetAsset)
+	protected.PUT("/liquid-assets/:id", liquidAssetHandler.UpdateAsset)
+	protected.DELETE("/liquid-assets/:id", liquidAssetHandler.DeleteAsset)
 
 	// Start server
 	port := getEnv("PORT", "8080")

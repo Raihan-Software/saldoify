@@ -9,13 +9,22 @@ import (
 )
 
 type Querier interface {
+	CountLiquidAssets(ctx context.Context, userID string) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CreateLiquidAsset(ctx context.Context, arg *CreateLiquidAssetParams) (*LiquidAsset, error)
 	CreateUser(ctx context.Context, arg *CreateUserParams) (*User, error)
+	DeleteLiquidAsset(ctx context.Context, id string) error
 	DeleteUser(ctx context.Context, id string) error
+	GetLiquidAssetByID(ctx context.Context, id string) (*LiquidAsset, error)
+	GetLiquidAssetsByUserID(ctx context.Context, userID string) ([]*LiquidAsset, error)
+	GetLiquidAssetsByUserIDAndType(ctx context.Context, arg *GetLiquidAssetsByUserIDAndTypeParams) ([]*LiquidAsset, error)
+	GetLiquidAssetsTotalValue(ctx context.Context, userID string) (interface{}, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	GetUserByID(ctx context.Context, id string) (*User, error)
 	GetUserByUsername(ctx context.Context, username *string) (*User, error)
+	ListLiquidAssets(ctx context.Context, arg *ListLiquidAssetsParams) ([]*LiquidAsset, error)
 	ListUsers(ctx context.Context, arg *ListUsersParams) ([]*User, error)
+	UpdateLiquidAsset(ctx context.Context, arg *UpdateLiquidAssetParams) (*LiquidAsset, error)
 	UpdateUser(ctx context.Context, arg *UpdateUserParams) (*User, error)
 }
 

@@ -1,367 +1,718 @@
-swagger: "2.0"
-info:
-  description: "A personal finance management API"
-  title: "Saldoify API"
-  version: "1.0"
-host: "localhost:8080"
-basePath: "/api/v1"
-schemes:
-  - "http"
-  - "https"
-securityDefinitions:
-  BearerAuth:
-    type: apiKey
-    name: Authorization
-    in: header
-paths:
-  /users/register:
-    post:
-      tags:
-        - users
-      summary: Register a new user
-      description: Create a new user account
-      consumes:
-        - application/json
-      produces:
-        - application/json
-      parameters:
-        - name: user
-          in: body
-          required: true
-          schema:
-            $ref: "#/definitions/CreateUserRequest"
-      responses:
-        201:
-          description: User created successfully
-          schema:
-            $ref: "#/definitions/UserResponse"
-        400:
-          description: Bad Request
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        409:
-          description: Conflict
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        500:
-          description: Internal Server Error
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /users/login:
-    post:
-      tags:
-        - users
-      summary: User login
-      description: Authenticate user and return JWT token
-      consumes:
-        - application/json
-      produces:
-        - application/json
-      parameters:
-        - name: credentials
-          in: body
-          required: true
-          schema:
-            $ref: "#/definitions/LoginRequest"
-      responses:
-        200:
-          description: Login successful
-          schema:
-            $ref: "#/definitions/LoginResponse"
-        400:
-          description: Bad Request
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        401:
-          description: Unauthorized
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        500:
-          description: Internal Server Error
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /users/profile:
-    get:
-      tags:
-        - users
-      summary: Get current user profile
-      description: Get the profile of the currently authenticated user
-      produces:
-        - application/json
-      security:
-        - BearerAuth: []
-      responses:
-        200:
-          description: User profile retrieved successfully
-          schema:
-            $ref: "#/definitions/UserResponse"
-        401:
-          description: Unauthorized
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        404:
-          description: User not found
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        500:
-          description: Internal Server Error
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /users/{id}:
-    get:
-      tags:
-        - users
-      summary: Get user by ID
-      description: Retrieve user information by ID
-      produces:
-        - application/json
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          type: string
-          description: User ID
-      responses:
-        200:
-          description: User retrieved successfully
-          schema:
-            $ref: "#/definitions/UserResponse"
-        400:
-          description: Bad Request
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        404:
-          description: User not found
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        500:
-          description: Internal Server Error
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-    put:
-      tags:
-        - users
-      summary: Update user
-      description: Update user information
-      consumes:
-        - application/json
-      produces:
-        - application/json
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          type: string
-          description: User ID
-        - name: user
-          in: body
-          required: true
-          schema:
-            $ref: "#/definitions/UpdateUserRequest"
-      responses:
-        200:
-          description: User updated successfully
-          schema:
-            $ref: "#/definitions/UserResponse"
-        400:
-          description: Bad Request
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        404:
-          description: User not found
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        409:
-          description: Conflict
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        500:
-          description: Internal Server Error
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-    delete:
-      tags:
-        - users
-      summary: Delete user
-      description: Delete user account
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          type: string
-          description: User ID
-      responses:
-        204:
-          description: User deleted successfully
-        400:
-          description: Bad Request
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        404:
-          description: User not found
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        500:
-          description: Internal Server Error
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-  /users:
-    get:
-      tags:
-        - users
-      summary: List users
-      description: Get a paginated list of users
-      produces:
-        - application/json
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: limit
-          in: query
-          type: integer
-          description: Number of users to return (default: 10, max: 100)
-        - name: offset
-          in: query
-          type: integer
-          description: Number of users to skip (default: 0)
-      responses:
-        200:
-          description: Users retrieved successfully
-          schema:
-            type: object
-            properties:
-              users:
-                type: array
-                items:
-                  $ref: "#/definitions/UserResponse"
-              total:
-                type: integer
-              limit:
-                type: integer
-              offset:
-                type: integer
-        400:
-          description: Bad Request
-          schema:
-            type: object
-            additionalProperties:
-              type: string
-        500:
-          description: Internal Server Error
-          schema:
-            type: object
-            additionalProperties:
-              type: string
+basePath: /api/v1
 definitions:
-  CreateUserRequest:
-    type: object
+  models.CreateLiquidAssetRequest:
+    properties:
+      asset_type:
+        enum:
+        - cash
+        - savings
+        - checking
+        - investment
+        - crypto
+        type: string
+      current_value:
+        minimum: 0
+        type: number
+      description:
+        maxLength: 1000
+        type: string
+      name:
+        maxLength: 255
+        minLength: 1
+        type: string
     required:
-      - email
-      - name
-      - password
+    - asset_type
+    - current_value
+    - name
+    type: object
+  models.CreateUserRequest:
     properties:
       email:
         type: string
-        format: email
       name:
-        type: string
-        minLength: 2
         maxLength: 100
-      username:
+        minLength: 2
         type: string
-        minLength: 3
-        maxLength: 50
       password:
-        type: string
         minLength: 6
-  UpdateUserRequest:
-    type: object
-    properties:
-      name:
         type: string
-        minLength: 2
-        maxLength: 100
       username:
-        type: string
-        minLength: 3
         maxLength: 50
-  LoginRequest:
-    type: object
+        minLength: 3
+        type: string
     required:
-      - email
-      - password
-    properties:
-      email:
-        type: string
-        format: email
-      password:
-        type: string
-  UserResponse:
+    - email
+    - name
+    - password
     type: object
+  models.LiquidAssetResponse:
     properties:
-      id:
-        type: string
-      email:
-        type: string
-        format: email
-      name:
-        type: string
-      username:
+      asset_type:
         type: string
       created_at:
         type: string
-        format: date-time
+      current_value:
+        type: number
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
       updated_at:
         type: string
-        format: date-time
-  LoginResponse:
+      user_id:
+        type: string
     type: object
+  models.LiquidAssetsListResponse:
     properties:
-      user:
-        $ref: "#/definitions/UserResponse"
+      assets:
+        items:
+          $ref: '#/definitions/models.LiquidAssetResponse'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      total:
+        type: integer
+      total_value:
+        type: number
+    type: object
+  models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  models.LoginResponse:
+    properties:
       token:
         type: string
+      user:
+        $ref: '#/definitions/models.User'
+    type: object
+  models.UpdateLiquidAssetRequest:
+    properties:
+      asset_type:
+        enum:
+        - cash
+        - savings
+        - checking
+        - investment
+        - crypto
+        type: string
+      current_value:
+        minimum: 0
+        type: number
+      description:
+        maxLength: 1000
+        type: string
+      name:
+        maxLength: 255
+        minLength: 1
+        type: string
+    type: object
+  models.UpdateUserRequest:
+    properties:
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  models.UserResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: A personal finance management API
+  title: Saldoify API
+  version: "1.0"
+paths:
+  /liquid-assets:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of liquid assets for the authenticated user
+      parameters:
+      - description: 'Number of assets to return (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Number of assets to skip (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LiquidAssetsListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List liquid assets
+      tags:
+      - liquid-assets
+    post:
+      consumes:
+      - application/json
+      description: Create a new liquid asset for the authenticated user
+      parameters:
+      - description: Liquid asset data
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateLiquidAssetRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.LiquidAssetResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new liquid asset
+      tags:
+      - liquid-assets
+  /liquid-assets/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a liquid asset
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Asset deleted successfully
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete liquid asset
+      tags:
+      - liquid-assets
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a specific liquid asset by ID
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LiquidAssetResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get liquid asset by ID
+      tags:
+      - liquid-assets
+    put:
+      consumes:
+      - application/json
+      description: Update an existing liquid asset
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Liquid asset update data
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateLiquidAssetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LiquidAssetResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update liquid asset
+      tags:
+      - liquid-assets
+  /liquid-assets/total:
+    get:
+      consumes:
+      - application/json
+      description: Get the total value of all liquid assets for the authenticated
+        user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LiquidAssetResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get total value of liquid assets
+      tags:
+      - liquid-assets
+  /liquid-assets/type/{type}:
+    get:
+      consumes:
+      - application/json
+      description: Get all liquid assets of a specific type for the authenticated
+        user
+      parameters:
+      - description: Asset type (cash, savings, checking, investment, crypto)
+        in: path
+        name: type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.LiquidAssetResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get liquid assets by type
+      tags:
+      - liquid-assets
+  /users:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of users
+      parameters:
+      - description: 'Number of users to return (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: 'Number of users to skip (default: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: users, total, limit, offset
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - users
+  /users/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete user account
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: User deleted successfully
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete user
+      tags:
+      - users
+    get:
+      consumes:
+      - application/json
+      description: Retrieve user information by ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user by ID
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      description: Update user information
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User update data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update user
+      tags:
+      - users
+  /users/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User login
+      tags:
+      - users
+  /users/profile:
+    get:
+      consumes:
+      - application/json
+      description: Get the profile of the currently authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get current user profile
+      tags:
+      - users
+  /users/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      parameters:
+      - description: User registration data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
